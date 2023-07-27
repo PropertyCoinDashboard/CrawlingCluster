@@ -1,0 +1,7 @@
+pandas
+numpy
+bs4
+selenium
+black
+pylint
+mypy
