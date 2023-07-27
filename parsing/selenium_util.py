@@ -3,11 +3,10 @@ crawling selenium
 """
 
 import time
-import datetime
 import configparser
-from abc import ABCMeta, abstractmethod
-from typing import Any, Coroutine
 from pathlib import Path
+from typing import Any, Coroutine
+from abc import ABCMeta, abstractmethod
 
 
 import aiohttp
@@ -48,48 +47,40 @@ option_chrome.add_argument("--disable-extensions")
 option_chrome.add_argument("user-agent=" + USERAGENT)
 
 
-# prefs: dict[str, dict[str, int]] = {
-# "profile.default_content_setting_values": {
-#         "cookies": 2,
-#         "images": 2,
-#         "plugins": 2,
-#         "popups": 2,
-#         "geolocation": 2,
-#         "notifications": 2,
-#         "auto_select_certificate": 2,
-#         "fullscreen": 2,
-#         "mouselock": 2,
-#         "mixed_script": 2,
-#         "media_stream": 2,
-#         "media_stream_mic": 2,
-#         "media_stream_camera": 2,
-#         "protocol_handlers": 2,
-#         "ppapi_broker": 2,
-#         "automatic_downloads": 2,
-#         "midi_sysex": 2,
-#         "push_messaging": 2,
-#         "ssl_cert_decisions": 2,
-#         "metro_switch_to_desktop": 2,
-#         "protected_media_identifier": 2,
-#         "app_banner": 2,
-#         "site_engagement": 2,
-#         "durable_storage": 2,
-#     }
-# }
+prefs: dict[str, dict[str, int]] = {
+    "profile.default_content_setting_values": {
+        "cookies": 2,
+        "images": 2,
+        "plugins": 2,
+        "popups": 2,
+        "geolocation": 2,
+        "notifications": 2,
+        "auto_select_certificate": 2,
+        "fullscreen": 2,
+        "mouselock": 2,
+        "mixed_script": 2,
+        "media_stream": 2,
+        "media_stream_mic": 2,
+        "media_stream_camera": 2,
+        "protocol_handlers": 2,
+        "ppapi_broker": 2,
+        "automatic_downloads": 2,
+        "midi_sysex": 2,
+        "push_messaging": 2,
+        "ssl_cert_decisions": 2,
+        "metro_switch_to_desktop": 2,
+        "protected_media_identifier": 2,
+        "app_banner": 2,
+        "site_engagement": 2,
+        "durable_storage": 2,
+    }
+}
 
-# option_chrome.add_experimental_option("prefs", prefs)
-
-# 현재 시각하는 시간 설정
-start_time = datetime.datetime.now()
-
-# 로그
-logging = log(name="start", log_location=f"{path_location}/log/start.log")
-
-logging.info("start time in --> %s", start_time)
+option_chrome.add_experimental_option("prefs", prefs)
 
 # chrome driver
 web_driver = webdriver.Chrome(
-    f"{path_location}/config/chromedriver", options=option_chrome
+    service=f"{path_location}/pconfig/chromedriver", options=option_chrome
 )  # <- options로 변경
 
 
@@ -98,14 +89,16 @@ class NewsParsingDrive(metaclass=ABCMeta):
     유틸리티
     """
 
-    def __init__(self, count: int = None, data: str = None) -> None:
+    def __init__(self, count: int, data: str, site: str) -> None:
         """
         Args:
             count        (int): 크롤링할 데이터의 카운트
             data         (str): 크롤링할 데이터
+            site         (str): 크롤링 호출 사이트
         """
         self.count = count
         self.data = data
+        self.logger = log(f"{site}", f"{path_location}/log/info.log")
 
     @abstractmethod
     def get_build_header(self) -> dict[str, str]:
@@ -118,15 +111,31 @@ class NewsParsingDrive(metaclass=ABCMeta):
 
     @abstractmethod
     def get_build_url(self) -> str:
-        """url
+        """api site url
 
         Args:
-            url (str): start url
+            url (str): url
 
         Returns:
             str: url
         """
         return NotImplementedError()
+
+    async def url_parsing(
+        self, url: str, headers: dict[str, Any]
+    ) -> Coroutine[Any, Any, Any]:
+        """
+        url parsing
+        """
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, headers=headers) as resp:
+                match resp.status:
+                    case 200:
+                        return await resp.json()
+                    case _:
+                        raise requests.exceptions.RequestException(
+                            f"API Request에 실패하였습니다 status code --> {resp.status}"
+                        )
 
     async def get_news_data(
         self, target: str, items: str, titles: str, link: str
@@ -142,13 +151,10 @@ class NewsParsingDrive(metaclass=ABCMeta):
         Returns:
             _type_: str
         """
-        logger = log(f"{target}_data", f"{path_location}/log/info.log")
-        res_data_naver = await self.url_parsing(
-            self.get_build_url(), self.get_build_header()
-        )
+        res_data = await self.url_parsing(self.get_build_url(), self.get_build_header())
 
         count = 0
-        for item in res_data_naver[items]:
+        for item in res_data[items]:
             title = item[titles]
             url = item[link]
             count += 1
@@ -156,21 +162,7 @@ class NewsParsingDrive(metaclass=ABCMeta):
             print(f"{target} Title: {title}")
             print(f"{target} URL: {url}")
             print("--------------------")
-        logger.info("%s parsing data --> %s", target, count)
-
-    async def url_parsing(
-        self, url: str, headers: dict[str, Any]
-    ) -> Coroutine[Any, Any, Any]:
-        """
-        url parsing
-        """
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, headers=headers) as resp:
-                if resp.status != 200:
-                    raise requests.exceptions.RequestException(
-                        f"API Request에 실패하였습니다 status code --> {resp.status}"
-                    )
-                return await resp.json()
+        self.logger.info("%s parsing data --> %s", target, count)
 
 
 class NaverNewsParsingDriver(NewsParsingDrive):
@@ -181,18 +173,19 @@ class NaverNewsParsingDriver(NewsParsingDrive):
     """
 
     def __init__(self, count: int, data: str) -> None:
-        super().__init__(count, data)
-        # Args:
-        #     count (int, optional): 뉴스 크롤링할 사이트 1 ~ 몇개 까지 가져올까 .
-        #     data  (str, optional): 뉴스 크롤링할 사이트 데이터 검색.
-        # Function:
-        #     naver_news_data
-        #         - 파라미터 존재하지 않음
-        #         - return 값 None
-        #             - items(dict, if NotFound is optional) :
-        #                 - items 안에 list가 있음 각 self.data 의 내용의 뉴스가 담겨 있음
-        #                     - link -> href
-        #                     - title(str, optional) title 존재 안할 수 있음
+        super().__init__(count, data, site="Naver")
+
+    # Args:
+    #     count (int, optional): 뉴스 크롤링할 사이트 1 ~ 몇개 까지 가져올까 .
+    #     data  (str, optional): 뉴스 크롤링할 사이트 데이터 검색.
+    # Function:
+    #     naver_news_data
+    #         - 파라미터 존재하지 않음
+    #         - return 값 None
+    #             - items(dict, if NotFound is optional) :
+    #                 - items 안에 list가 있음 각 self.data 의 내용의 뉴스가 담겨 있음
+    #                     - link -> href
+    #                     - title(str, optional) title 존재 안할 수 있음
 
     def get_build_header(self) -> dict[str, str]:
         return {
@@ -220,18 +213,19 @@ class DaumNewsParsingDriver(NewsParsingDrive):
     """
 
     def __init__(self, count: int, data: str) -> None:
-        super().__init__(count, data)
-        # Args:
-        #     count (int, optional): 뉴스 크롤링할 사이트 1 ~ 몇개 까지 가져올까 .
-        #     data (str, optional): 뉴스 크롤링할 사이트 데이터 검색.
-        # Function:
-        #     get_daum_news_data
-        #         - 파라미터 존재하지 않음
-        #         - return 값 None
-        #             - documents(dict, if NotFound is optional) :
-        #                 - documents 안에 list가 있음 각 self.data 의 내용의 뉴스
-        #                     - url -> href
-        #                     - title(str, optional) title 존재 안할 수 있음
+        super().__init__(count, data, site="Daum")
+
+    # Args:
+    #     count (int, optional): 뉴스 크롤링할 사이트 1 ~ 몇개 까지 가져올까 .
+    #     data (str, optional): 뉴스 크롤링할 사이트 데이터 검색.
+    # Function:
+    #     get_daum_news_data
+    #         - 파라미터 존재하지 않음
+    #         - return 값 None
+    #             - documents(dict, if NotFound is optional) :
+    #                 - documents 안에 list가 있음 각 self.data 의 내용의 뉴스
+    #                     - url -> href
+    #                     - title(str, optional) title 존재 안할 수 있음
 
     def get_build_header(self) -> dict[str, str]:
         return {"Authorization": daum_auth}
