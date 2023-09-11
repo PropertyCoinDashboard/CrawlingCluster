@@ -12,10 +12,12 @@ from abc import ABCMeta, abstractmethod
 import aiohttp
 import requests
 from selenium import webdriver
+from selenium.webdriver.chrome.service import Service as ChromeService
+
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
-
+from webdriver_manager.chrome import ChromeDriverManager
 
 from parsing.web_parser import CoinSymbolParsingDriver
 from parsing.schema.create_log import log
@@ -80,8 +82,8 @@ option_chrome.add_experimental_option("prefs", prefs)
 
 # chrome driver
 web_driver = webdriver.Chrome(
-    service=f"{path_location}/pconfig/chromedriver", options=option_chrome
-)  # <- options로 변경
+    service=ChromeService(ChromeDriverManager().install()), options=option_chrome
+)
 
 
 class NewsParsingDrive(metaclass=ABCMeta):
@@ -173,19 +175,20 @@ class NaverNewsParsingDriver(NewsParsingDrive):
     """
 
     def __init__(self, count: int, data: str) -> None:
+        """
+        Args:
+            count (int, optional): 뉴스 크롤링할 사이트 1 ~ 몇개 까지 가져올까 .
+            data  (str, optional): 뉴스 크롤링할 사이트 데이터 검색.
+        Function:
+            naver_news_data
+                - 파라미터 존재하지 않음
+                - return 값 None
+                    - items(dict, if NotFound is optional) :
+                        - items 안에 list가 있음 각 self.data 의 내용의 뉴스가 담겨 있음
+                            - link -> href
+                            - title(str, optional) title 존재 안할 수 있음
+        """
         super().__init__(count, data, site="Naver")
-
-    # Args:
-    #     count (int, optional): 뉴스 크롤링할 사이트 1 ~ 몇개 까지 가져올까 .
-    #     data  (str, optional): 뉴스 크롤링할 사이트 데이터 검색.
-    # Function:
-    #     naver_news_data
-    #         - 파라미터 존재하지 않음
-    #         - return 값 None
-    #             - items(dict, if NotFound is optional) :
-    #                 - items 안에 list가 있음 각 self.data 의 내용의 뉴스가 담겨 있음
-    #                     - link -> href
-    #                     - title(str, optional) title 존재 안할 수 있음
 
     def get_build_header(self) -> dict[str, str]:
         return {
@@ -213,19 +216,20 @@ class DaumNewsParsingDriver(NewsParsingDrive):
     """
 
     def __init__(self, count: int, data: str) -> None:
+        """
+        Args:
+            count (int, optional): 뉴스 크롤링할 사이트 1 ~ 몇개 까지 가져올까 .
+            data (str, optional): 뉴스 크롤링할 사이트 데이터 검색.
+        Function:
+            get_daum_news_data
+                - 파라미터 존재하지 않음
+                - return 값 None
+                    - documents(dict, if NotFound is optional) :
+                        - documents 안에 list가 있음 각 self.data 의 내용의 뉴스
+                            - url -> href
+                            - title(str, optional) title 존재 안할 수 있음
+        """
         super().__init__(count, data, site="Daum")
-
-    # Args:
-    #     count (int, optional): 뉴스 크롤링할 사이트 1 ~ 몇개 까지 가져올까 .
-    #     data (str, optional): 뉴스 크롤링할 사이트 데이터 검색.
-    # Function:
-    #     get_daum_news_data
-    #         - 파라미터 존재하지 않음
-    #         - return 값 None
-    #             - documents(dict, if NotFound is optional) :
-    #                 - documents 안에 list가 있음 각 self.data 의 내용의 뉴스
-    #                     - url -> href
-    #                     - title(str, optional) title 존재 안할 수 있음
 
     def get_build_header(self) -> dict[str, str]:
         return {"Authorization": daum_auth}

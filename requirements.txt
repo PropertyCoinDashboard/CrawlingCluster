@@ -5,3 +5,6 @@ selenium
 black
 pylint
 mypy
+aiohttp
+requests
+webdriver-manager
