@@ -3,9 +3,7 @@ This module contains classes for parsing web pages.
 """
 import re
 import time
-import configparser
 from typing import Any
-from pathlib import Path
 from dataclasses import dataclass, asdict
 
 import urllib3
