@@ -2,14 +2,14 @@
 파일 유틸리티
 """
 from typing import Any
-from urllib.parse import urlparse
 from pathlib import Path
-from bs4 import BeautifulSoup
-from parsing.util.create_log import log
+from urllib.parse import urlparse
 
 import aiohttp
 import pandas as pd
 
+from bs4 import BeautifulSoup
+from parsing.util.create_log import log
 
 path_location = Path(__file__).parent.parent.parent
 
@@ -61,17 +61,18 @@ def soup_data(html_data: str, element: str, elements: dict[str, str]) -> list:
 
 
 # 비동기 연결
-async def url_parsing(url: str, headers: dict[str, Any]):
+async def url_parsing(target: str, url: str, headers: dict[str, Any]):
     """
     url parsing
     """
+    logger = log(f"{target}", f"{path_location}/log/info.log")
+
     try:
         async with aiohttp.ClientSession() as session:
             async with session.get(url, headers=headers) as resp:
                 return await resp.json()
     except aiohttp.ClientError as error:
-        pass
-        # raise logger.error(f"Error during API request: {error}")
+        logger.error("Error during API request: %s", error)
 
 
 # API 호출해올 비동기 함수 (Naver, Daum)
@@ -98,7 +99,7 @@ async def get_news_data(
         _type_: str
     """
     logger = log(f"{target}", f"{path_location}/log/info.log")
-    res_data = await url_parsing(target_url, build_header)
+    res_data = await url_parsing(target, target_url, build_header)
 
     count = 0
     for item in res_data[items]:
@@ -106,7 +107,7 @@ async def get_news_data(
         url = item[link]
         count += 1
 
-        logger.info(f"{target} Title: {title}")
-        logger.info(f"{target} URL: {url}")
+        logger.info("%s Title: %s", target, title)
+        logger.info("%s URL: %s", target, url)
         logger.info("--------------------")
     logger.info("%s parsing data --> %s", target, count)
