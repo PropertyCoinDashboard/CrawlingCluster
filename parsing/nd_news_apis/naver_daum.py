@@ -4,17 +4,13 @@ crawling selenium
 
 import configparser
 from pathlib import Path
-from typing import Any, Coroutine
 from abc import ABCMeta, abstractmethod
 
-
-import aiohttp
-import requests
-from parsing.schema.create_log import log
+from parsing.util.util_parser import get_news_data
 
 
 # 부모 경로
-path_location = Path(__file__).parent.parent
+path_location = Path(__file__).parent.parent.parent
 
 # key_parser
 parser = configparser.ConfigParser()
@@ -42,7 +38,6 @@ class NewsParsingDrive(metaclass=ABCMeta):
         """
         self.count = count
         self.data = data
-        self.logger = log(f"{site}", f"{path_location}/log/info.log")
 
     @abstractmethod
     def get_build_header(self) -> dict[str, str]:
@@ -64,49 +59,6 @@ class NewsParsingDrive(metaclass=ABCMeta):
             str: url
         """
         return NotImplementedError()
-
-    async def url_parsing(
-        self, url: str, headers: dict[str, Any]
-    ) -> Coroutine[Any, Any, Any]:
-        """
-        url parsing
-        """
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, headers=headers) as resp:
-                match resp.status:
-                    case 200:
-                        return await resp.json()
-                    case _:
-                        raise requests.exceptions.RequestException(
-                            f"API Request에 실패하였습니다 status code --> {resp.status}"
-                        )
-
-    async def get_news_data(
-        self, target: str, items: str, titles: str, link: str
-    ) -> Coroutine[Any, Any, None]:
-        """new parsing
-
-        Args:
-            target (str): 타겟 API
-            items (str): 첫번째 접근
-            title (str): 타이틀
-            link (str): url
-
-        Returns:
-            _type_: str
-        """
-        res_data = await self.url_parsing(self.get_build_url(), self.get_build_header())
-
-        count = 0
-        for item in res_data[items]:
-            title = item[titles]
-            url = item[link]
-            count += 1
-
-            print(f"{target} Title: {title}")
-            print(f"{target} URL: {url}")
-            print("--------------------")
-        self.logger.info("%s parsing data --> %s", target, count)
 
 
 class NaverNewsParsingDriver(NewsParsingDrive):
@@ -145,8 +97,13 @@ class NaverNewsParsingDriver(NewsParsingDrive):
         """
         naver news parsing
         """
-        await self.get_news_data(
-            target="Naver", items="items", titles="title", link="link"
+        await get_news_data(
+            target="Naver",
+            items="items",
+            titles="title",
+            link="link",
+            target_url=self.get_build_url(),
+            build_header=self.get_build_header(),
         )
 
 
@@ -185,10 +142,11 @@ class DaumNewsParsingDriver(NewsParsingDrive):
         """
         daum news parsing
         """
-        await self.get_news_data(
-            target="Daum", items="documents", titles="title", link="url"
+        await get_news_data(
+            target="Daum",
+            items="documents",
+            titles="title",
+            link="url",
+            target_url=self.get_build_url(),
+            build_header=self.get_build_header(),
         )
-
-
-class GoogleSearchDataInfomer:
-    pass
