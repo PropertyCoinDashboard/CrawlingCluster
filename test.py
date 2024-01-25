@@ -26,23 +26,18 @@ async def main() -> None:
     )
 
 
-def process_bithum():
+def process_bithum() -> None:
     bithum_parser = BithumSymbolParsingUtility()
-    result = bithum_parser.close_bit_page_and_get_source()
-    # Process the result if needed
+    bithum_parser.close_bit_page_and_get_source()
 
 
-def process_korbit():
+def process_korbit() -> None:
     korbit_parser = KorbitSymbolParsingUtility()
-    result = korbit_parser.korbit_page()
-    # Process the result if needed
+    korbit_parser.korbit_page()
 
 
 if __name__ == "__main__":
-    # Create separate processes for each utility
-    asyncio.run(main())
-
-    data = [process_bithum, process_korbit]
+    data = [process_bithum, process_korbit, asyncio.run(main())]
     processes = []
 
     for p in data:
@@ -52,13 +47,3 @@ if __name__ == "__main__":
 
     for pp in processes:
         pp.join()
-    # bithum_process = Process(target=process_bithum)
-    # korbit_process = Process(target=process_korbit)
-
-    # # Start the processes
-    # bithum_process.start()
-    # korbit_process.start()
-
-    # # Wait for both processes to finish
-    # bithum_process.join()
-    # korbit_process.join()
