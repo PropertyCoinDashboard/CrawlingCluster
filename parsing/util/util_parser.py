@@ -61,18 +61,19 @@ def soup_data(html_data: str, element: str, elements: dict[str, str]) -> list:
 
 
 # 비동기 연결
-async def url_parsing(target: str, url: str, headers: dict[str, Any]):
+async def url_parsing(url: str, headers: dict[str, Any]):
     """
     url parsing
     """
-    logger = log(f"{target}", f"{path_location}/log/info.log")
-
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(url, headers=headers) as resp:
-                return await resp.json()
-    except aiohttp.ClientError as error:
-        logger.error("Error during API request: %s", error)
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url, headers=headers) as resp:
+            match resp.status:
+                case 200:
+                    return await resp.json()
+                case _:
+                    raise aiohttp.ClientError(
+                        f"API Request에 실패하였습니다 status code --> {resp.status}"
+                    )
 
 
 # API 호출해올 비동기 함수 (Naver, Daum)
@@ -99,7 +100,7 @@ async def get_news_data(
         _type_: str
     """
     logger = log(f"{target}", f"{path_location}/log/info.log")
-    res_data = await url_parsing(target, target_url, build_header)
+    res_data = await url_parsing(target_url, build_header)
 
     count = 0
     for item in res_data[items]:
