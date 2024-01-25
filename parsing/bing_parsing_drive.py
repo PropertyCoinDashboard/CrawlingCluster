@@ -8,10 +8,10 @@ from parsing.selenium_parsing import PageUtilityDriver
 
 class BingNewsCrawlingParsingDrive(PageUtilityDriver):
     """
-    Google News Parsing Drive
+    bing News Parsing Drive
 
     Args:
-        GoogleUtilityDriver (_type_): _description_
+        PageUtilityDriver (str): Html str
     """
 
     def __init__(self, url: str) -> None:

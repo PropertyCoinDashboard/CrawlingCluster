@@ -11,7 +11,7 @@ class GoogleNewsCrawlingParsingDrive(PageUtilityDriver):
     Google News Parsing Drive
 
     Args:
-        GoogleUtilityDriver (_type_): _description_
+        GoogleUtilityDriver (str): _description_
     """
 
     def __init__(self, url: str) -> None:

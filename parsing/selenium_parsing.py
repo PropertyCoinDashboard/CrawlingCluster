@@ -117,7 +117,7 @@ class BithumSymbolParsingUtility(CoinSymbolParsingDriver):
 
 class PageUtilityDriver:
     """
-    Google Homepage Parsing
+    Homepage Parsing
     """
 
     def __init__(self, url: str) -> None:
