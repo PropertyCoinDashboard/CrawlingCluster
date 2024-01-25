@@ -4,7 +4,7 @@
 import asyncio
 from multiprocessing import Process
 
-from parsing.naver_daum import (
+from parsing.naver_daum_news_api import (
     NaverNewsParsingDriver,
     DaumNewsParsingDriver,
 )

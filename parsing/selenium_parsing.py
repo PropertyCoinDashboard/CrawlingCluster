@@ -16,7 +16,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 
 from parsing.util.util_parser import csv_saving
 from parsing.util.xpath_location import USERAGENT, WAIT_TIME, BITHUM_POPUP_BUTTON
-from parsing.coin_parsing_driver import CoinSymbolParsingDriver
+from parsing.coin_parsing_drive import CoinSymbolParsingDriver
 
 
 # 크롬 옵션 설정
@@ -115,11 +115,20 @@ class BithumSymbolParsingUtility(CoinSymbolParsingDriver):
             csv_saving(data=symbol, csv_file_name="bithum.csv")
 
 
-class GoogleUtilityDriver:
-    def __init__(self, driver=web_driver) -> None:
-        self.url = f"https://www.google.com"
-        self.driver = driver
+class PageUtilityDriver:
+    """
+    Google Homepage Parsing
+    """
+
+    def __init__(self, url: str) -> None:
+        self.url = url
+        self.driver = web_driver
 
     def page(self) -> str:
+        """
+
+        Returns:
+            str: HTML source
+        """
         self.driver.get(self.url)
         return self.driver.page_source

@@ -16,7 +16,8 @@ PAGE_LOAD_DELAY = 2
 WAIT_TIME = 2
 
 
-GOOGLE_SEARCH_XPATH = '//*[@name="q"]'
+GOOGLE_SEARCH_XPATH = '//*[@id="APjFqb"]'
+# GOOGLE_SEARCH_XPATH = '//*[@name="q"]'
 BING_SEARCH_XPATH = '//*[@id="sb_form_q"]'
 
 # news element xpath location
