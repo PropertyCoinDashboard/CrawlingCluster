@@ -42,13 +42,23 @@ if __name__ == "__main__":
     # Create separate processes for each utility
     asyncio.run(main())
 
-    bithum_process = Process(target=process_bithum)
-    korbit_process = Process(target=process_korbit)
+    data = [process_bithum, process_korbit]
+    processes = []
 
-    # Start the processes
-    bithum_process.start()
-    korbit_process.start()
+    for p in data:
+        process = Process(target=p)
+        processes.append(process)
+        process.start()
 
-    # Wait for both processes to finish
-    bithum_process.join()
-    korbit_process.join()
+    for pp in processes:
+        pp.join()
+    # bithum_process = Process(target=process_bithum)
+    # korbit_process = Process(target=process_korbit)
+
+    # # Start the processes
+    # bithum_process.start()
+    # korbit_process.start()
+
+    # # Wait for both processes to finish
+    # bithum_process.join()
+    # korbit_process.join()
