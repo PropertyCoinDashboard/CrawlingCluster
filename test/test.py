@@ -2,11 +2,12 @@
 # 기능 테스트
 # """
 import asyncio
-from parsing.nd_news_apis.naver_daum import (
+from multiprocessing import Process
+
+from parsing.naver_daum import (
     NaverNewsParsingDriver,
     DaumNewsParsingDriver,
 )
-from multiprocessing import Process
 from parsing.selenium_parsing import (
     KorbitSymbolParsingUtility,
     BithumSymbolParsingUtility,

@@ -29,12 +29,11 @@ class NewsParsingDrive(metaclass=ABCMeta):
     유틸리티
     """
 
-    def __init__(self, count: int, data: str, site: str) -> None:
+    def __init__(self, count: int, data: str) -> None:
         """
         Args:
             count        (int): 크롤링할 데이터의 카운트
             data         (str): 크롤링할 데이터
-            site         (str): 크롤링 호출 사이트
         """
         self.count = count
         self.data = data
@@ -66,23 +65,17 @@ class NaverNewsParsingDriver(NewsParsingDrive):
 
     Args:
         SeleniumUtility (_type_): 유틸리티 클래스
+        count (int, optional): 뉴스 크롤링할 사이트 1 ~ 몇개 까지 가져올까 .
+        data  (str, optional): 뉴스 크롤링할 사이트 데이터 검색.
+    Function:
+        naver_news_data
+            - 파라미터 존재하지 않음
+            - return 값 None
+                - items(dict, if NotFound is optional) :
+                    - items 안에 list가 있음 각 self.data 의 내용의 뉴스가 담겨 있음
+                        - link -> href
+                        - title(str, optional) title 존재 안할 수 있음
     """
-
-    def __init__(self, count: int, data: str) -> None:
-        """
-        Args:
-            count (int, optional): 뉴스 크롤링할 사이트 1 ~ 몇개 까지 가져올까 .
-            data  (str, optional): 뉴스 크롤링할 사이트 데이터 검색.
-        Function:
-            naver_news_data
-                - 파라미터 존재하지 않음
-                - return 값 None
-                    - items(dict, if NotFound is optional) :
-                        - items 안에 list가 있음 각 self.data 의 내용의 뉴스가 담겨 있음
-                            - link -> href
-                            - title(str, optional) title 존재 안할 수 있음
-        """
-        super().__init__(count, data, site="Naver")
 
     def get_build_header(self) -> dict[str, str]:
         return {
@@ -112,23 +105,17 @@ class DaumNewsParsingDriver(NewsParsingDrive):
 
     Args:
         SeleniumUtility (_type_): 유틸리티 클래스
+        count (int, optional): 뉴스 크롤링할 사이트 1 ~ 몇개 까지 가져올까 .
+        data (str, optional): 뉴스 크롤링할 사이트 데이터 검색.
+    Function:
+        get_daum_news_data
+            - 파라미터 존재하지 않음
+            - return 값 None
+                - documents(dict, if NotFound is optional) :
+                    - documents 안에 list가 있음 각 self.data 의 내용의 뉴스
+                        - url -> href
+                        - title(str, optional) title 존재 안할 수 있음
     """
-
-    def __init__(self, count: int, data: str) -> None:
-        """
-        Args:
-            count (int, optional): 뉴스 크롤링할 사이트 1 ~ 몇개 까지 가져올까 .
-            data (str, optional): 뉴스 크롤링할 사이트 데이터 검색.
-        Function:
-            get_daum_news_data
-                - 파라미터 존재하지 않음
-                - return 값 None
-                    - documents(dict, if NotFound is optional) :
-                        - documents 안에 list가 있음 각 self.data 의 내용의 뉴스
-                            - url -> href
-                            - title(str, optional) title 존재 안할 수 있음
-        """
-        super().__init__(count, data, site="Daum")
 
     def get_build_header(self) -> dict[str, str]:
         return {"Authorization": daum_auth}

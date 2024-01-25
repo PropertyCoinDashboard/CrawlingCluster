@@ -16,7 +16,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 
 from parsing.util.util_parser import csv_saving
 from parsing.util.xpath_location import USERAGENT, WAIT_TIME, BITHUM_POPUP_BUTTON
-from parsing.kb_coin_symbol_parsing.coin_parsing_driver import CoinSymbolParsingDriver
+from parsing.coin_parsing_driver import CoinSymbolParsingDriver
 
 
 # 크롬 옵션 설정
