@@ -116,36 +116,34 @@ class GoogleMovingElementsLocation(PageUtilityDriver, GoogleNewsCrawlingParsingD
         super().__init__(url=self.url)
 
     def search_box_page_type(self, xpath: str) -> Any:
-        news_box_type: Any = WebDriverWait(self.driver, WAIT_TIME).until(
-            EC.presence_of_element_located((By.XPATH, xpath))
-        )
-        return news_box_type
+        try:
+            news_box_type: Any = WebDriverWait(self.driver, WAIT_TIME).until(
+                EC.presence_of_element_located((By.XPATH, xpath))
+            )
+            return news_box_type
+        except TimeoutException:
+            return None
 
     def handle_news_box_scenario(self, xpath: str) -> None:
-        try:
-            news_box = self.search_box_page_type(xpath)
+        news_box = self.search_box_page_type(xpath)
+        if news_box:
             news_box.click()
             self.page_scroll_moving()
             self.next_page_moving()
-        except TimeoutException:
-            pass  # TimeoutException 무시
 
     def search_box(self) -> str:
         """
-        google 의 page변환 정책으로 각각 요소마다 2중 try 적용
-        별로 좋아보이진 않지만 만들어놓고 개선 작업 시작
-
+        google 자동화할시 3가지 컨셉의 html이 있는걸 확인하여
+        각 시나리오마다 Xpath를 각기 적용하여 회피하였음
         """
         self.driver.get(self.url)
 
-        # 시나리오 1 처리
-        self.handle_news_box_scenario(GOOGLE_NEWS_TAB_XPATH1)
-
-        # 시나리오 2 처리
-        self.handle_news_box_scenario(GOOGLE_NEWS_TAB_XPATH2)
-
-        # 시나리오 3 처리
-        self.handle_news_box_scenario(GOOGLE_NEWS_TAB_XPATH3)
+        for xpath in [
+            GOOGLE_NEWS_TAB_XPATH1,
+            GOOGLE_NEWS_TAB_XPATH2,
+            GOOGLE_NEWS_TAB_XPATH3,
+        ]:
+            self.handle_news_box_scenario(xpath)
 
     def page_scroll_moving(self) -> None:
         """
@@ -156,10 +154,13 @@ class GoogleMovingElementsLocation(PageUtilityDriver, GoogleNewsCrawlingParsingD
         )
         for i in range(1, SCROLL_ITERATIONS):
             time.sleep(5)
-            scrol_cal: int = prev_height / SCROLL_ITERATIONS * i
-            self.driver.execute_script(f"window.scrollTo(0, {scrol_cal})")
+            scroll_cal: int = prev_height / SCROLL_ITERATIONS * i
+            self.driver.execute_script(f"window.scrollTo(0, {scroll_cal})")
 
     def next_page_moving(self) -> None:
+        """
+        다음페이지로 넘어가기
+        """
         for i in range(3, self.count + 1):
             next_page_button = self.search_box_page_type(
                 f'//*[@id="botstuff"]/div/div[3]/table/tbody/tr/td[{i}]/a'
@@ -172,6 +173,13 @@ class GoogleMovingElementsLocation(PageUtilityDriver, GoogleNewsCrawlingParsingD
 
 
 class BingMovingElementLocation(PageUtilityDriver, BingNewsCrawlingParsingDrive):
+    """빙 홈페이지 크롤링
+
+    Args:
+        PageUtilityDriver (str): html
+        BingNewsCrawlingParsingDrive (class): parsingDrive
+    """
+
     def __init__(self, target: str, count: int) -> None:
         self.url = f"https://www.bing.com/news/search?q={target}"
         self.count = count
@@ -181,7 +189,7 @@ class BingMovingElementLocation(PageUtilityDriver, BingNewsCrawlingParsingDrive)
         self.driver.get(self.url)
 
         # 스크롤 내리기 전 위치
-        scroll_location = self.driver.execute_script(
+        scroll_location: int = self.driver.execute_script(
             "return document.body.scrollHeight"
         )
 
@@ -194,14 +202,13 @@ class BingMovingElementLocation(PageUtilityDriver, BingNewsCrawlingParsingDrive)
             time.sleep(5)
 
             # 늘어난 스크롤 높이
-            scroll_height = self.driver.execute_script(
+            scroll_height: int = self.driver.execute_script(
                 "return document.body.scrollHeight"
             )
             i += 1
 
             # page url
-            news_page = self.news_info_collect(self.driver.page_source)
-            print(news_page)
+            self.news_info_collect(self.driver.page_source)
             # 늘어난 스크롤 위치와 이동 전 위치 같으면(더 이상 스크롤이 늘어나지 않으면) 종료
             if scroll_location == scroll_height:
                 break
