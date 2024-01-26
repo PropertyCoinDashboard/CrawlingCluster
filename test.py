@@ -40,7 +40,7 @@
 if __name__ == "__main__":
     from parsing.selenium_parsing import GoogleMovingElementsLocation
 
-    GoogleMovingElementsLocation(target="비트코인").search_box()
+    GoogleMovingElementsLocation("비트코인").search_box()
 
     # data = [process_bithum, process_korbit, asyncio.run(main())]
     # processes = []

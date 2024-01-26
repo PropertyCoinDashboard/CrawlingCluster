@@ -14,6 +14,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 
 
 from parsing.coin_parsing_drive import CoinSymbolParsingDriver
+from parsing.google_parsing_drive import GoogleNewsCrawlingParsingDrive
 from parsing.util.util_parser import csv_saving
 from parsing.util._xpath_location import (
     USERAGENT,
@@ -98,7 +99,7 @@ class PageUtilityDriver:
         return self.driver.page_source
 
 
-class GoogleMovingElementsLocation(PageUtilityDriver):
+class GoogleMovingElementsLocation(GoogleNewsCrawlingParsingDrive, PageUtilityDriver):
     """Google 셀레니움 요소 움직이기
 
     Args:
@@ -109,17 +110,18 @@ class GoogleMovingElementsLocation(PageUtilityDriver):
         self.url = f"https://www.google.com/search?q={target}"
         super().__init__(url=self.url)
 
-    def handle_news_box_scenario(self, xpath: str) -> None:
-        def search_box_page_type(xpath: str) -> Any:
-            news_box_type: Any = WebDriverWait(self.driver, WAIT_TIME).until(
-                EC.presence_of_element_located((By.XPATH, xpath))
-            )
-            return news_box_type
+    def search_box_page_type(self, xpath: str) -> Any:
+        news_box_type: Any = WebDriverWait(self.driver, WAIT_TIME).until(
+            EC.presence_of_element_located((By.XPATH, xpath))
+        )
+        return news_box_type
 
+    def handle_news_box_scenario(self, xpath: str) -> None:
         try:
-            news_box = search_box_page_type(xpath)
+            news_box = self.search_box_page_type(xpath)
             news_box.click()
             self.page_scroll_moving()
+            self.next_page_moving()
         except TimeoutException:
             pass  # TimeoutException 무시
 
@@ -140,8 +142,6 @@ class GoogleMovingElementsLocation(PageUtilityDriver):
         # 시나리오 3 처리
         self.handle_news_box_scenario(GOOGLE_NEWS_TAB_XPATH3)
 
-        return self.driver.page_source
-
     def page_scroll_moving(self) -> None:
         """
         google 스크롤 계산 내리기 5번에 걸쳐서 내리기
@@ -151,17 +151,20 @@ class GoogleMovingElementsLocation(PageUtilityDriver):
         )
         print("현재 높이 :", prev_height)
         for i in range(1, SCROLL_ITERATIONS):
-            time.sleep(2)
-            self.driver.execute_script(
-                f"window.scrollTo(0, {prev_height / SCROLL_ITERATIONS * i})"
+            time.sleep(5)
+            scrol_cal: int = prev_height / SCROLL_ITERATIONS * i
+            self.driver.execute_script(f"window.scrollTo(0, {scrol_cal})")
+
+    def next_page_moving(self) -> None:
+        for i in range(3, 11):
+            next_page_button = self.search_box_page_type(
+                f'//*[@id="botstuff"]/div/div[3]/table/tbody/tr/td[{i}]/a'
             )
-            present_height: int = self.driver.execute_script(
-                "return document.body.scrollHeight"
-            )
-            if present_height != 0:
-                self.driver.execute_script(
-                    f"window.scrollTo(0, {prev_height / SCROLL_ITERATIONS * i})"
-                )
+            if next_page_button:
+                print(self.news_info_collect(self.driver.page_source))
+                next_page_button.click()
+                time.sleep(5)
+                self.page_scroll_moving()
 
 
 class KorbitSymbolParsingUtility(CoinSymbolParsingDriver, PageUtilityDriver):

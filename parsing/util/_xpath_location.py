@@ -13,7 +13,7 @@ BITHUM_POPUP_BUTTON = '//*[@id="popUpContainer"]/div/div/div/div/div/div[2]/butt
 
 # waiting time
 PAGE_LOAD_DELAY = 2
-WAIT_TIME = 10
+WAIT_TIME = 5
 SCROLL_ITERATIONS = 5
 
 
