@@ -14,5 +14,5 @@ class BingNewsCrawlingParsingDrive(PageUtilityDriver):
         PageUtilityDriver (str): Html str
     """
 
-    def __init__(self, url: str) -> None:
+    def __init__(self) -> None:
         super().__init__(url="https://www.bing.com")
