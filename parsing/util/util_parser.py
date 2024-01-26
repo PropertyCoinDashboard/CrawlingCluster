@@ -1,7 +1,7 @@
 """
 파일 유틸리티
 """
-from typing import Any
+from typing import Any, Union
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -51,11 +51,18 @@ def url_addition(url: str) -> str:
     return link
 
 
-def soup_data(html_data: str, element: str, elements: dict[str, str]) -> list:
+def soup_data(
+    html_data: str, 
+    element: str, 
+    elements: dict[str, Union[str, list[str]]], 
+    soup: BeautifulSoup = None
+) -> list:
     """
     Parse the HTML data using BeautifulSoup
     """
-    soup = BeautifulSoup(html_data, "lxml")
+    if soup is None:
+        soup = BeautifulSoup(html_data, "lxml")
+        
     search_results = soup.find_all(element, elements)
     return search_results if search_results else []
 

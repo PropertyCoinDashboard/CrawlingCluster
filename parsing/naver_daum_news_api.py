@@ -64,7 +64,6 @@ class NaverNewsParsingDriver(NewsParsingDrive):
     """네이버 API 호출
 
     Args:
-        SeleniumUtility (_type_): 유틸리티 클래스
         count (int, optional): 뉴스 크롤링할 사이트 1 ~ 몇개 까지 가져올까 .
         data  (str, optional): 뉴스 크롤링할 사이트 데이터 검색.
     Function:
@@ -104,7 +103,6 @@ class DaumNewsParsingDriver(NewsParsingDrive):
     """다음 API 호출
 
     Args:
-        SeleniumUtility (_type_): 유틸리티 클래스
         count (int, optional): 뉴스 크롤링할 사이트 1 ~ 몇개 까지 가져올까 .
         data (str, optional): 뉴스 크롤링할 사이트 데이터 검색.
     Function:

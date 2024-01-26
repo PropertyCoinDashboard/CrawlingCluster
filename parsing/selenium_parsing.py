@@ -1,6 +1,6 @@
 import time
 import urllib3
-from typing import Any, override
+from typing import Any
 from urllib3 import exceptions
 
 from selenium import webdriver
@@ -13,7 +13,7 @@ from selenium.common.exceptions import TimeoutException
 from webdriver_manager.chrome import ChromeDriverManager
 
 
-from parsing.coin_parsing_drive import CoinSymbolParsingDriver
+from parsing.coin_parsing_drive import korbit_parsing_page, bithum_parsing_page
 from parsing.google_bing_parsing_drive import (
     GoogleNewsCrawlingParsingDrive,
     BingNewsCrawlingParsingDrive,
@@ -102,7 +102,7 @@ class PageUtilityDriver:
         return self.driver.page_source
 
 
-class GoogleMovingElementsLocation(GoogleNewsCrawlingParsingDrive, PageUtilityDriver):
+class GoogleMovingElementsLocation(PageUtilityDriver, GoogleNewsCrawlingParsingDrive):
     """Google 셀레니움 요소 움직이기
 
     Args:
@@ -169,13 +169,13 @@ class GoogleMovingElementsLocation(GoogleNewsCrawlingParsingDrive, PageUtilityDr
                 self.page_scroll_moving()
 
 
-class BingMovingElementLocation(BingNewsCrawlingParsingDrive, PageUtilityDriver):
+class BingMovingElementLocation(PageUtilityDriver, BingNewsCrawlingParsingDrive):
     def __init__(self, target: str) -> None:
         self.url = f"https://www.bing.com/news/search?q={target}"
         super().__init__(url=self.url)
 
 
-class KorbitSymbolParsingUtility(CoinSymbolParsingDriver, PageUtilityDriver):
+class KorbitSymbolParsingUtility(PageUtilityDriver):
     """Korbit 심볼
 
     Args:
@@ -191,11 +191,11 @@ class KorbitSymbolParsingUtility(CoinSymbolParsingDriver, PageUtilityDriver):
         """
         self.driver.get(self.url)
         time.sleep(2)
-        symbol = self.korbit_parsing_page(html_data=self.driver.page_source)
+        symbol = korbit_parsing_page(html_data=self.driver.page_source)
         csv_saving(data=symbol, csv_file_name="korbit.csv")
 
 
-class BithumSymbolParsingUtility(CoinSymbolParsingDriver, PageUtilityDriver):
+class BithumSymbolParsingUtility(PageUtilityDriver):
     """빗썸 심볼
 
     Args:
@@ -216,5 +216,5 @@ class BithumSymbolParsingUtility(CoinSymbolParsingDriver, PageUtilityDriver):
             )
             pop_up_button.click()
         except TimeoutException:
-            symbol = self.bithum_parsing_page(html_data=self.driver.page_source)
+            symbol = bithum_parsing_page(html_data=self.driver.page_source)
             csv_saving(data=symbol, csv_file_name="bithum.csv")
