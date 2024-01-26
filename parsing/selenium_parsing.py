@@ -27,49 +27,49 @@ from parsing.util._xpath_location import (
 )
 
 
-# # 크롬 옵션 설정
-# option_chrome = webdriver.ChromeOptions()
-# option_chrome.add_argument("headless")
-# option_chrome.add_argument("disable-gpu")
-# option_chrome.add_argument("disable-infobars")
-# option_chrome.add_argument("--disable-extensions")
-# option_chrome.add_argument("user-agent=" + USERAGENT)
+# 크롬 옵션 설정
+option_chrome = webdriver.ChromeOptions()
+option_chrome.add_argument("headless")
+option_chrome.add_argument("disable-gpu")
+option_chrome.add_argument("disable-infobars")
+option_chrome.add_argument("--disable-extensions")
+option_chrome.add_argument("user-agent=" + USERAGENT)
 
 
-# prefs: dict[str, dict[str, int]] = {
-#     "profile.default_content_setting_values": {
-#         "cookies": 2,
-#         "images": 2,
-#         "plugins": 2,
-#         "popups": 2,
-#         "geolocation": 2,
-#         "notifications": 2,
-#         "auto_select_certificate": 2,
-#         "fullscreen": 2,
-#         "mouselock": 2,
-#         "mixed_script": 2,
-#         "media_stream": 2,
-#         "media_stream_mic": 2,
-#         "media_stream_camera": 2,
-#         "protocol_handlers": 2,
-#         "ppapi_broker": 2,
-#         "automatic_downloads": 2,
-#         "midi_sysex": 2,
-#         "push_messaging": 2,
-#         "ssl_cert_decisions": 2,
-#         "metro_switch_to_desktop": 2,
-#         "protected_media_identifier": 2,
-#         "app_banner": 2,
-#         "site_engagement": 2,
-#         "durable_storage": 2,
-#     }
-# }
+prefs: dict[str, dict[str, int]] = {
+    "profile.default_content_setting_values": {
+        "cookies": 2,
+        "images": 2,
+        "plugins": 2,
+        "popups": 2,
+        "geolocation": 2,
+        "notifications": 2,
+        "auto_select_certificate": 2,
+        "fullscreen": 2,
+        "mouselock": 2,
+        "mixed_script": 2,
+        "media_stream": 2,
+        "media_stream_mic": 2,
+        "media_stream_camera": 2,
+        "protocol_handlers": 2,
+        "ppapi_broker": 2,
+        "automatic_downloads": 2,
+        "midi_sysex": 2,
+        "push_messaging": 2,
+        "ssl_cert_decisions": 2,
+        "metro_switch_to_desktop": 2,
+        "protected_media_identifier": 2,
+        "app_banner": 2,
+        "site_engagement": 2,
+        "durable_storage": 2,
+    }
+}
 
-# option_chrome.add_experimental_option("prefs", prefs)
+option_chrome.add_experimental_option("prefs", prefs)
 
 # chrome driver
 web_driver = webdriver.Chrome(
-    service=ChromeService(ChromeDriverManager().install()),
+    service=ChromeService(ChromeDriverManager().install()), options=option_chrome
 )
 
 # Disable warnings for insecure requests
@@ -149,7 +149,6 @@ class GoogleMovingElementsLocation(GoogleNewsCrawlingParsingDrive, PageUtilityDr
         prev_height: int = self.driver.execute_script(
             "return document.body.scrollHeight"
         )
-        print("현재 높이 :", prev_height)
         for i in range(1, SCROLL_ITERATIONS):
             time.sleep(5)
             scrol_cal: int = prev_height / SCROLL_ITERATIONS * i
