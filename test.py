@@ -46,11 +46,11 @@ def process_bing() -> None:
 
 if __name__ == "__main__":
     data = [
-        # process_bithum,
-        # process_korbit,
+        process_bithum,
+        process_korbit,
         process_google,
         process_bing,
-        # asyncio.run(main()),
+        asyncio.run(main()),
     ]
     processes = []
 
