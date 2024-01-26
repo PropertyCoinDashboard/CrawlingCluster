@@ -109,8 +109,10 @@ class GoogleMovingElementsLocation(PageUtilityDriver, GoogleNewsCrawlingParsingD
         PageUtilityDriver (str): HTML page 요소들
     """
 
-    def __init__(self, target: str) -> None:
+    def __init__(self, target: str, count: int) -> None:
         self.url = f"https://www.google.com/search?q={target}"
+        self.count = count
+
         super().__init__(url=self.url)
 
     def search_box_page_type(self, xpath: str) -> Any:
@@ -158,7 +160,7 @@ class GoogleMovingElementsLocation(PageUtilityDriver, GoogleNewsCrawlingParsingD
             self.driver.execute_script(f"window.scrollTo(0, {scrol_cal})")
 
     def next_page_moving(self) -> None:
-        for i in range(3, 11):
+        for i in range(3, self.count + 1):
             next_page_button = self.search_box_page_type(
                 f'//*[@id="botstuff"]/div/div[3]/table/tbody/tr/td[{i}]/a'
             )
@@ -170,9 +172,46 @@ class GoogleMovingElementsLocation(PageUtilityDriver, GoogleNewsCrawlingParsingD
 
 
 class BingMovingElementLocation(PageUtilityDriver, BingNewsCrawlingParsingDrive):
-    def __init__(self, target: str) -> None:
+    def __init__(self, target: str, count: int) -> None:
         self.url = f"https://www.bing.com/news/search?q={target}"
+        self.count = count
         super().__init__(url=self.url)
+
+    def repeat_scroll(self):
+        self.driver.get(self.url)
+
+        # 스크롤 내리기 전 위치
+        scroll_location = self.driver.execute_script(
+            "return document.body.scrollHeight"
+        )
+
+        i = 0
+        while i < self.count:
+            # 현재 스크롤의 가장 아래로 내림
+            self.driver.execute_script("window.scrollTo(0,document.body.scrollHeight)")
+
+            # 전체 스크롤이 늘어날 때까지 대기
+            time.sleep(5)
+
+            # 늘어난 스크롤 높이
+            scroll_height = self.driver.execute_script(
+                "return document.body.scrollHeight"
+            )
+            i += 1
+
+            # page url
+            news_page = self.news_info_collect(self.driver.page_source)
+            print(news_page)
+            # 늘어난 스크롤 위치와 이동 전 위치 같으면(더 이상 스크롤이 늘어나지 않으면) 종료
+            if scroll_location == scroll_height:
+                break
+
+            # 같지 않으면 스크롤 위치 값을 수정하여 같아질 때까지 반복
+            else:
+                # 스크롤 위치값을 수정
+                scroll_location = self.driver.execute_script(
+                    "return document.body.scrollHeight"
+                )
 
 
 class KorbitSymbolParsingUtility(PageUtilityDriver):

@@ -12,7 +12,10 @@ from parsing.selenium_parsing import (
     KorbitSymbolParsingUtility,
     BithumSymbolParsingUtility,
 )
-from parsing.selenium_parsing import GoogleMovingElementsLocation
+from parsing.selenium_parsing import (
+    GoogleMovingElementsLocation,
+    BingMovingElementLocation,
+)
 
 
 async def main() -> None:
@@ -34,11 +37,21 @@ def process_korbit() -> None:
 
 
 def process_google() -> None:
-    GoogleMovingElementsLocation("비트코인").search_box()
+    GoogleMovingElementsLocation("비트코인", 5).search_box()
+
+
+def process_bing() -> None:
+    BingMovingElementLocation("비트코인", 5).repeat_scroll()
 
 
 if __name__ == "__main__":
-    data = [process_bithum, process_korbit, process_google, asyncio.run(main())]
+    data = [
+        # process_bithum,
+        # process_korbit,
+        process_google,
+        process_bing,
+        # asyncio.run(main()),
+    ]
     processes = []
 
     for p in data:
