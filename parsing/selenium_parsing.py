@@ -1,6 +1,6 @@
 import time
 import urllib3
-from typing import Any
+from typing import Any, override
 from urllib3 import exceptions
 
 from selenium import webdriver
@@ -14,7 +14,10 @@ from webdriver_manager.chrome import ChromeDriverManager
 
 
 from parsing.coin_parsing_drive import CoinSymbolParsingDriver
-from parsing.google_parsing_drive import GoogleNewsCrawlingParsingDrive
+from parsing.google_bing_parsing_drive import (
+    GoogleNewsCrawlingParsingDrive,
+    BingNewsCrawlingParsingDrive,
+)
 from parsing.util.util_parser import csv_saving
 from parsing.util._xpath_location import (
     USERAGENT,
@@ -81,7 +84,7 @@ class PageUtilityDriver:
     Homepage Parsing
     """
 
-    def __init__(self, url: str | None = None) -> None:
+    def __init__(self, url: str | None) -> None:
         self.url = url
         self.driver: webdriver.Chrome = web_driver
 
@@ -164,6 +167,12 @@ class GoogleMovingElementsLocation(GoogleNewsCrawlingParsingDrive, PageUtilityDr
                 next_page_button.click()
                 time.sleep(5)
                 self.page_scroll_moving()
+
+
+class BingMovingElementLocation(BingNewsCrawlingParsingDrive, PageUtilityDriver):
+    def __init__(self, target: str) -> None:
+        self.url = f"https://www.bing.com/news/search?q={target}"
+        super().__init__(url=self.url)
 
 
 class KorbitSymbolParsingUtility(CoinSymbolParsingDriver, PageUtilityDriver):
