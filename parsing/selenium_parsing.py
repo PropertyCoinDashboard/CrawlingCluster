@@ -161,7 +161,7 @@ class GoogleMovingElementsLocation(GoogleNewsCrawlingParsingDrive, PageUtilityDr
                 f'//*[@id="botstuff"]/div/div[3]/table/tbody/tr/td[{i}]/a'
             )
             if next_page_button:
-                print(self.news_info_collect(self.driver.page_source))
+                self.news_info_collect(self.driver.page_source)
                 next_page_button.click()
                 time.sleep(5)
                 self.page_scroll_moving()
