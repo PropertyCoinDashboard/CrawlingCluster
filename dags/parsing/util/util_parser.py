@@ -6,7 +6,7 @@ from typing import Any, Union
 from pathlib import Path
 from urllib.parse import urlparse
 
-import aiohttp
+import requests
 import pandas as pd
 
 from bs4 import BeautifulSoup
@@ -68,24 +68,25 @@ def soup_data(
     return search_results if search_results else []
 
 
-# 비동기 연결
-async def url_parsing(url: str, headers: dict[str, Any]):
+def url_parsing(url: str, headers: dict[str, Any]):
     """
     url parsing
     """
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url, headers=headers) as resp:
-            if resp.status == 200:
-                return await resp.json()
-            elif resp.status != 200:
-                raise aiohttp.ClientError(
-                    f"API Request에 실패하였습니다 status code --> {resp.status}"
-                )
+    # headers: dict[str, str] = {"accept": "application/json"}
+    response = requests.get(url, headers=headers, timeout=60)
+
+    match response.status_code:
+        case 200:
+            return response.json()
+        case _:
+            raise requests.exceptions.RequestException(
+                f"API Request에 실패하였습니다 status code --> {response.status_code}"
+            )
 
 
 # API 호출해올 비동기 함수 (Naver, Daum)
 ## 함수에 너무 많은 책임이 부여되어 있어 분할 필요성 느낌
-async def get_news_data(
+def get_news_data(
     target: str,
     items: str,
     titles: str,
@@ -107,7 +108,7 @@ async def get_news_data(
         _type_: str
     """
     logger = log(f"{target}", f"{path_location}/log/info.log")
-    res_data = await url_parsing(target_url, build_header)
+    res_data: Any = url_parsing(target_url, build_header)
 
     count = 0
     for item in res_data[items]:

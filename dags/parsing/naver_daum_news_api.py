@@ -10,11 +10,11 @@ from parsing.util.util_parser import get_news_data
 
 
 # 부모 경로
-path_location = Path(__file__).parent
+path_location = Path(__file__)
 
 # key_parser
 parser = configparser.ConfigParser()
-parser.read(f"{path_location}/config/url.conf")
+parser.read(f"{path_location.parent}/config/url.conf")
 
 naver_id: str = parser.get("naver", "X-Naver-Client-Id")
 naver_secret: str = parser.get("naver", "X-Naver-Client-Secret")
@@ -85,11 +85,12 @@ class NaverNewsParsingDriver(NewsParsingDrive):
     def get_build_url(self) -> str:
         return f"{naver_url}/news.json?query={self.data}&start=1&display={self.count}"
 
-    async def get_naver_news_data(self) -> None:
+    def get_naver_news_data(self) -> None:
         """
         naver news parsing
         """
-        await get_news_data(
+        print(self.get_build_header())
+        return get_news_data(
             target="Naver",
             items="items",
             titles="title",
@@ -123,11 +124,11 @@ class DaumNewsParsingDriver(NewsParsingDrive):
             f"{daum_url}/web?sort=accuracy&page=1&size={self.count}&query={self.data}"
         )
 
-    async def get_daum_news_data(self) -> None:
+    def get_daum_news_data(self) -> None:
         """
         daum news parsing
         """
-        await get_news_data(
+        return get_news_data(
             target="Daum",
             items="documents",
             titles="title",

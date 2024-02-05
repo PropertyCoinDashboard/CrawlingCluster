@@ -6,11 +6,9 @@ from urllib3 import exceptions
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.service import Service as ChromeService
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
-from webdriver_manager.chrome import ChromeDriverManager
 
 
 from parsing.coin_parsing_drive import korbit_parsing_page, bithum_parsing_page
@@ -70,6 +68,8 @@ prefs: dict[str, dict[str, int]] = {
 
 option_chrome.add_experimental_option("prefs", prefs)
 # chrome driver
+# from webdriver_manager.chrome import ChromeDriverManager
+# from selenium.webdriver.chrome.service import Service as ChromeService
 # web_driver = webdriver.Chrome(
 #     service=ChromeService("chromedriver"),
 #     options=option_chrome,

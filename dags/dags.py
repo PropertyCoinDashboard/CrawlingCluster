@@ -2,7 +2,6 @@
 기능 테스트
 """
 
-import asyncio
 from airflow import DAG
 from airflow.utils.dates import days_ago
 from airflow.operators.python import PythonOperator
@@ -13,6 +12,7 @@ from parsing.naver_daum_news_api import (
     NaverNewsParsingDriver,
     DaumNewsParsingDriver,
 )
+
 from parsing.selenium_parsing import (
     KorbitSymbolParsingUtility,
     BithumSymbolParsingUtility,
@@ -23,14 +23,12 @@ from parsing.selenium_parsing import (
 )
 
 
-async def main(count: int, target: str) -> None:
-    """
-    테스트
-    """
-    await asyncio.gather(
-        NaverNewsParsingDriver(count, target).get_naver_news_data(),
-        DaumNewsParsingDriver(count, target).get_daum_news_data(),
-    )
+def naver(count: int, target: str) -> None:
+    NaverNewsParsingDriver(count, target).get_naver_news_data(),
+
+
+def daum(count: int, target: str) -> None:
+    DaumNewsParsingDriver(count, target).get_daum_news_data(),
 
 
 def process_bithum() -> None:
@@ -57,9 +55,16 @@ with DAG(
         task_id="News_API_start", bash_command="echo crawling start!!"
     )
 
-    naver_daum_api_operator = PythonOperator(
-        task_id="get_news_api",
-        python_callable=main,
+    naver_api_operator = PythonOperator(
+        task_id="get_news_api_naver",
+        python_callable=naver,
+        op_args=[10, "BTC"],
+        dag=dag,
+    )
+
+    daum_api_operator = PythonOperator(
+        task_id="get_news_api_daum",
+        python_callable=naver,
         op_args=[10, "BTC"],
         dag=dag,
     )
@@ -68,4 +73,5 @@ with DAG(
         task_id="News_API_end", bash_command="echo end complete!!"
     )
 
-    start_operator >> naver_daum_api_operator >> end_operator
+    start_operator >> naver_api_operator >> end_operator
+    start_operator >> daum_api_operator >> end_operator
