@@ -1,5 +1,7 @@
 import time
 import urllib3
+
+# from pathlib import Path
 from typing import Any
 from urllib3 import exceptions
 
@@ -66,12 +68,14 @@ prefs: dict[str, dict[str, int]] = {
     }
 }
 
-option_chrome.add_experimental_option("prefs", prefs)
+# option_chrome.add_experimental_option("prefs")
 # chrome driver
 # from webdriver_manager.chrome import ChromeDriverManager
 # from selenium.webdriver.chrome.service import Service as ChromeService
+
+# path = Path(__file__)
 # web_driver = webdriver.Chrome(
-#     service=ChromeService("chromedriver"),
+#     service=ChromeService(f"{path}/chromedriver"),
 #     options=option_chrome,
 # )
 

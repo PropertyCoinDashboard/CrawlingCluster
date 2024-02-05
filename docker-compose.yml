@@ -61,6 +61,7 @@ x-airflow-common:
     AIRFLOW__CORE__FERNET_KEY: ''
     AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'true'
     AIRFLOW__CORE__TEST_CONNECTION: "enabled"
+    AIRFLOW__CORE__DAGBAG_IMPORT_TIMEOUT: 300.0
     # AIRFLOW__CORE__LOAD_EXAMPLES: 'true'
     AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth,airflow.api.auth.backend.session'
     # yamllint disable rule:line-length
@@ -309,13 +310,6 @@ services:
       interval: 10s
       timeout: 2s
       retries: 100
-  
-  selenium:
-    container_name: remote_chromedriver
-    image: seleniarm/standalone-chromium:latest
-    ports:
-      - 4444:4444
-    restart: always     
 
 volumes:
   postgres-db-volume:

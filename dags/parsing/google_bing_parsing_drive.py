@@ -1,9 +1,10 @@
 """
 Google Crawling Parsing Drive
 """
+
 import re
 from bs4 import BeautifulSoup
-from parsing.util.util_parser import soup_data
+from parsing.util.util_parser import soup_data, mysql_saving_hook
 
 
 class GoogleNewsCrawlingParsingDrive:
@@ -74,10 +75,11 @@ class GoogleNewsCrawlingParsingDrive:
         for div_1 in div_in_data_hveid:
             for div_2 in self.div_in_class(div_1):
                 for a_tag in self.div_a_tags(div_2):
-                    print(
-                        a_tag["href"],
-                        self.href_from_text_preprocessing(a_tag.text)[:20],
-                    )
+                    title = self.href_from_text_preprocessing(a_tag.text)[:20]
+                    url = a_tag["href"]
+
+                    query = f"INSERT INTO dash.log(location, title, url) VALUES ('google', '{title}', '{url}')"
+                    mysql_saving_hook(query)
 
 
 class BingNewsCrawlingParsingDrive:
@@ -115,4 +117,7 @@ class BingNewsCrawlingParsingDrive:
 
         for div_1 in div_class_algocore:
             for div_2 in self.div_in_class(div_1):
-                print(div_2["url"], div_2["data-title"][:20])
+                url = div_2["url"]
+                title = div_2["data-title"][:20]
+                query = f"INSERT INTO dash.log(location, title, url) VALUES ('bing', '{title}', '{url}')"
+                mysql_saving_hook(query)

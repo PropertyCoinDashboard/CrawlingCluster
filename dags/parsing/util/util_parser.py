@@ -17,6 +17,11 @@ from airflow.providers.mysql.hooks.mysql import MySqlHook
 path_location = Path(__file__).parent.parent.parent
 
 
+def mysql_saving_hook(query: str):
+    mysql_hook = MySqlHook(mysql_conn_id="airflow-sql")
+    mysql_hook.run(query)
+
+
 def csv_saving(data: list, csv_file_name: str) -> pd.DataFrame:
     """coin symbol csv saving
 
@@ -113,15 +118,14 @@ def get_news_data(
     res_data: Any = url_parsing(target_url, build_header)
 
     count = 0
-    mysql_hook = MySqlHook(mysql_conn_id="airflow-sql")
     for item in res_data[items]:
-        title = item[titles][:30]
+        title = item[titles][:20]
         url = item[link]
         count += 1
 
+        query = f"INSERT INTO dash.log(location, title, url) VALUES ('{target}', '{title}', '{url}')"
+        mysql_saving_hook(query)
         logger.info("%s Title: %s", target, title)
         logger.info("%s URL: %s", target, url)
         logger.info("--------------------")
-        query = f"INSERT INTO dash.log(location, title, url) VALUES ('{target}', '{title}', '{url}')"
-        mysql_hook.run(query)
     logger.info("%s parsing data --> %s", target, count)

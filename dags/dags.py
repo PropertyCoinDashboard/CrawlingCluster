@@ -37,20 +37,20 @@ def daum(count: int, target: str) -> None:
     DaumNewsParsingDriver(count, target).get_daum_news_data(),
 
 
+def process_google(count: int, target: str) -> None:
+    GoogleMovingElementsLocation(target, count).search_box()
+
+
+def process_bing(count: int, target: str) -> None:
+    BingMovingElementLocation(target, count).repeat_scroll()
+
+
 def process_bithum() -> None:
     BithumSymbolParsingUtility().close_bit_page_and_get_source()
 
 
 def process_korbit() -> None:
     KorbitSymbolParsingUtility().korbit_page()
-
-
-def process_google() -> None:
-    GoogleMovingElementsLocation("비트코인", 5).search_box()
-
-
-def process_bing() -> None:
-    BingMovingElementLocation("비트코인", 5).repeat_scroll()
 
 
 with DAG(
@@ -75,6 +75,20 @@ with DAG(
         dag=dag,
     )
 
+    google_sel_operator = PythonOperator(
+        task_id="get_news_api_google",
+        python_callable=process_google,
+        op_args=["BTC", 10],
+        dag=dag,
+    )
+
+    bing_sel_operator = PythonOperator(
+        task_id="get_news_api_bing",
+        python_callable=process_bing,
+        op_args=["BTC", 10],
+        dag=dag,
+    )
+
     saving_operator = BashOperator(
         task_id="News_API_saving", bash_command="echo saving complete!!"
     )
@@ -85,3 +99,5 @@ with DAG(
 
     start_operator >> naver_api_operator >> saving_operator >> end_operator
     start_operator >> daum_api_operator >> saving_operator >> end_operator
+    start_operator >> google_sel_operator >> saving_operator >> end_operator
+    start_operator >> bing_sel_operator >> saving_operator >> end_operator
