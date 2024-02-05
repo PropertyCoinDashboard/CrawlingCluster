@@ -1,5 +1,9 @@
 # CrawlingCluster
 
+## architecutre
+<img width="898" alt="image" src="https://github.com/PropertyCoinDashboard/CrawlingCluster/assets/52487610/d9e33ddd-a630-45a6-b402-61b6f31cd7ea">
+
+
 ## 상속 구조 
 ![크롤링 설계도 drawio](https://github.com/PropertyCoinDashboard/CrawlingCluster/assets/52487610/743813fc-f611-4455-96a0-e2dcb1bae860)
 
