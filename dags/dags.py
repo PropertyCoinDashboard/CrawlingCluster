@@ -64,7 +64,7 @@ with DAG(
 
     daum_api_operator = PythonOperator(
         task_id="get_news_api_daum",
-        python_callable=naver,
+        python_callable=daum,
         op_args=[10, "BTC"],
         dag=dag,
     )

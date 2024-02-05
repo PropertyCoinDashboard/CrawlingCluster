@@ -89,7 +89,6 @@ class NaverNewsParsingDriver(NewsParsingDrive):
         """
         naver news parsing
         """
-        print(self.get_build_header())
         return get_news_data(
             target="Naver",
             items="items",
