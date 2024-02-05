@@ -24,19 +24,9 @@ from parsing.selenium_parsing import (
 )
 
 
-# sql_create_table: str = """
-#     CREATE TABLE `log` (
-#     `id` int NOT NULL AUTO_INCREMENT,
-#     `location` varchar(45) NOT NULL,
-#     `title` datetime NOT NULL,
-#     `url` varchar(45) NOT NULL,
-#     PRIMARY KEY (`id`)
-#     ) ENGINE=InnoDB AUTO_INCREMENT=83852 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
-# """
-
 # # MySQL 연결 설정
-# mysql_conn_id = "airflow-sql"
-# mysql_hook = MySqlHook(mysql_conn_id=mysql_conn_id)
+mysql_conn_id = "airflow-sql"
+mysql_hook = MySqlHook(mysql_conn_id=mysql_conn_id)
 
 
 def naver(count: int, target: str) -> None:
@@ -85,9 +75,13 @@ with DAG(
         dag=dag,
     )
 
+    saving_operator = BashOperator(
+        task_id="News_API_saving", bash_command="echo saving complete!!"
+    )
+
     end_operator = BashOperator(
         task_id="News_API_end", bash_command="echo end complete!!"
     )
 
-    start_operator >> naver_api_operator >> end_operator
-    start_operator >> daum_api_operator >> end_operator
+    start_operator >> naver_api_operator >> saving_operator >> end_operator
+    start_operator >> daum_api_operator >> saving_operator >> end_operator

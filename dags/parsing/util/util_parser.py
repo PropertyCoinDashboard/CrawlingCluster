@@ -11,6 +11,8 @@ import pandas as pd
 
 from bs4 import BeautifulSoup
 from parsing.util.create_log import log
+from airflow.providers.mysql.hooks.mysql import MySqlHook
+
 
 path_location = Path(__file__).parent.parent.parent
 
@@ -111,12 +113,15 @@ def get_news_data(
     res_data: Any = url_parsing(target_url, build_header)
 
     count = 0
+    mysql_hook = MySqlHook(mysql_conn_id="airflow-sql")
     for item in res_data[items]:
-        title = item[titles]
+        title = item[titles][:30]
         url = item[link]
         count += 1
 
         logger.info("%s Title: %s", target, title)
         logger.info("%s URL: %s", target, url)
         logger.info("--------------------")
+        query = f"INSERT INTO dash.log(location, title, url) VALUES ('{target}', '{title}', '{url}')"
+        mysql_hook.run(query)
     logger.info("%s parsing data --> %s", target, count)
