@@ -8,3 +8,7 @@ mypy
 aiohttp
 requests
 webdriver-manager
+pymysql
+boto3
+configparser
+faker

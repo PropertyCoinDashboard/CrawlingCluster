@@ -163,3 +163,4 @@ chromedriver
 poetry.lock
 pyproject.toml
 .vscode
+init.sql
