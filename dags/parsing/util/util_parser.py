@@ -1,6 +1,7 @@
 """
 파일 유틸리티
 """
+
 from typing import Any, Union
 from pathlib import Path
 from urllib.parse import urlparse
@@ -52,17 +53,17 @@ def url_addition(url: str) -> str:
 
 
 def soup_data(
-    html_data: str, 
-    element: str, 
-    elements: dict[str, Union[str, list[str]]], 
-    soup: BeautifulSoup = None
+    html_data: str,
+    element: str,
+    elements: dict[str, Union[str, list[str]]],
+    soup: BeautifulSoup = None,
 ) -> list:
     """
     Parse the HTML data using BeautifulSoup
     """
     if soup is None:
         soup = BeautifulSoup(html_data, "lxml")
-        
+
     search_results = soup.find_all(element, elements)
     return search_results if search_results else []
 
@@ -74,13 +75,12 @@ async def url_parsing(url: str, headers: dict[str, Any]):
     """
     async with aiohttp.ClientSession() as session:
         async with session.get(url, headers=headers) as resp:
-            match resp.status:
-                case 200:
-                    return await resp.json()
-                case _:
-                    raise aiohttp.ClientError(
-                        f"API Request에 실패하였습니다 status code --> {resp.status}"
-                    )
+            if resp.status == 200:
+                return await resp.json()
+            elif resp.status != 200:
+                raise aiohttp.ClientError(
+                    f"API Request에 실패하였습니다 status code --> {resp.status}"
+                )
 
 
 # API 호출해올 비동기 함수 (Naver, Daum)

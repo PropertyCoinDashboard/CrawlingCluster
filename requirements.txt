@@ -12,3 +12,4 @@ pymysql
 boto3
 configparser
 faker
+apache-airflow

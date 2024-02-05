@@ -10,7 +10,7 @@ from parsing.util.util_parser import get_news_data
 
 
 # 부모 경로
-path_location = Path(__file__).parent.parent
+path_location = Path(__file__).parent
 
 # key_parser
 parser = configparser.ConfigParser()
