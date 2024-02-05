@@ -13,3 +13,4 @@ boto3
 configparser
 faker
 apache-airflow
+apache-airflow-providers-mysql

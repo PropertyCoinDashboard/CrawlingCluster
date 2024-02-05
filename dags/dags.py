@@ -6,6 +6,7 @@ from airflow import DAG
 from airflow.utils.dates import days_ago
 from airflow.operators.python import PythonOperator
 from airflow.operators.bash import BashOperator
+from airflow.providers.mysql.hooks.mysql import MySqlHook
 
 
 from parsing.naver_daum_news_api import (
@@ -21,6 +22,21 @@ from parsing.selenium_parsing import (
     GoogleMovingElementsLocation,
     BingMovingElementLocation,
 )
+
+
+# sql_create_table: str = """
+#     CREATE TABLE `log` (
+#     `id` int NOT NULL AUTO_INCREMENT,
+#     `location` varchar(45) NOT NULL,
+#     `title` datetime NOT NULL,
+#     `url` varchar(45) NOT NULL,
+#     PRIMARY KEY (`id`)
+#     ) ENGINE=InnoDB AUTO_INCREMENT=83852 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+# """
+
+# # MySQL 연결 설정
+# mysql_conn_id = "airflow-sql"
+# mysql_hook = MySqlHook(mysql_conn_id=mysql_conn_id)
 
 
 def naver(count: int, target: str) -> None:
