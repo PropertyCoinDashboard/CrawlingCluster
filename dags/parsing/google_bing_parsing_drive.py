@@ -56,7 +56,7 @@ class GoogleNewsCrawlingParsingDrive:
             str: 특수문자 및 시간제거
                 - ex) 어쩌구 저쩌구
         """
-        return re.sub(r"\b\d+시간 전\b|\.{2,}\b", "", text)
+        return re.sub(r"\b\d+시간 전\b|\.{2,}|[^\w\s]", "", text)
 
     def news_info_collect(self, html_source: str) -> None:
         """요소 추출 시작점
@@ -71,14 +71,12 @@ class GoogleNewsCrawlingParsingDrive:
             elements={"data-hveid": re.compile(r"CA|QHw")},
             soup=BeautifulSoup(html_source, "lxml"),
         )
-
         for div_1 in div_in_data_hveid:
             for div_2 in self.div_in_class(div_1):
                 for a_tag in self.div_a_tags(div_2):
                     title = self.href_from_text_preprocessing(a_tag.text)[:20]
                     url = a_tag["href"]
-
-                    query = f"INSERT INTO dash.log(location, title, url) VALUES ('google', '{title}', '{url}')"
+                    query = f'INSERT INTO dash.log(location, title, url) VALUES ("Google", "{title}", "{url}")'
                     mysql_saving_hook(query)
 
 
@@ -100,6 +98,19 @@ class BingNewsCrawlingParsingDrive:
         """
         return element.find_all("div", {"class": "news-card newsitem cardcommon"})
 
+    def href_from_text_preprocessing(self, text: str) -> str:
+        """텍스트 전처리
+
+        Args:
+            text (str): URL title 및 시간
+                - ex) 어쩌구 저쩌구...12시간
+
+        Returns:
+            str: 특수문자 및 시간제거
+                - ex) 어쩌구 저쩌구
+        """
+        return re.sub(r"\b\d+시간 전\b|\.{2,}|[^\w\s]", "", text)
+
     def news_info_collect(self, html_source: str) -> None:
         """시작점
 
@@ -118,6 +129,6 @@ class BingNewsCrawlingParsingDrive:
         for div_1 in div_class_algocore:
             for div_2 in self.div_in_class(div_1):
                 url = div_2["url"]
-                title = div_2["data-title"][:20]
-                query = f"INSERT INTO dash.log(location, title, url) VALUES ('bing', '{title}', '{url}')"
+                title = self.href_from_text_preprocessing(div_2["data-title"][:20])
+                query = f'INSERT INTO dash.log(location, title, url) VALUES ("Bing", "{title}", "{url}")'
                 mysql_saving_hook(query)
