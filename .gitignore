@@ -166,3 +166,4 @@ pyproject.toml
 init.sql
 logs
 plugins
+.DS_Store
