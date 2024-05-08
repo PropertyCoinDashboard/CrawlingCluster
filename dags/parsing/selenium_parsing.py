@@ -3,13 +3,18 @@ import urllib3
 
 from typing import Any
 from urllib3 import exceptions
+
+import undetected_chromedriver as uc
 from selenium import webdriver
-from selenium.common.exceptions import InvalidSessionIdException
-from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.common.exceptions import (
+    InvalidSessionIdException,
+    TimeoutException,
+    NoSuchElementException,
+)
+from fake_useragent import UserAgent
 
 
 from parsing.coin_parsing_drive import korbit_parsing_page, bithum_parsing_page
@@ -27,21 +32,24 @@ from parsing.util._xpath_location import (
     GOOGLE_NEWS_TAB_XPATH2,
     GOOGLE_NEWS_TAB_XPATH3,
     GOOGLE_NEWS_TAB_XPATH4,
+    GOOGLE_NEWS_TAB_XPATH5,
+    GOOGLE_NEWS_TAB_XPATH6,
 )
 
 # Disable warnings for insecure requests
 urllib3.disable_warnings(exceptions.InsecureRequestWarning)
 
+ua = UserAgent()
+
 
 def chrome_option_injection():
     # 크롬 옵션 설정
-    option_chrome = webdriver.ChromeOptions()
+    option_chrome = uc.ChromeOptions()
     option_chrome.add_argument("headless")
     option_chrome.add_argument("disable-gpu")
     option_chrome.add_argument("disable-infobars")
     option_chrome.add_argument("--disable-extensions")
-    option_chrome.add_argument("user-agent=" + USERAGENT)
-
+    option_chrome.add_argument(f"user-agent={ua.random}")
     prefs: dict[str, dict[str, int]] = {
         "profile.default_content_setting_values": {
             "cookies": 2,
@@ -70,6 +78,7 @@ def chrome_option_injection():
             "durable_storage": 2,
         }
     }
+
     option_chrome.add_experimental_option("prefs", prefs)
     webdriver_remote = webdriver.Remote(
         "http://chrome:4444/wd/hub", options=option_chrome
@@ -78,10 +87,8 @@ def chrome_option_injection():
     # from selenium.webdriver.chrome.service import Service as ChromeService
 
     # webdriver_remote = webdriver.Chrome(
-    #     service=ChromeService(ChromeDriverManager().install()),
-    #     options=option_chrome,
+    #     service=ChromeService(ChromeDriverManager().install()), options=option_chrome
     # )
-
     return webdriver_remote
 
 
@@ -99,12 +106,15 @@ class GoogleMovingElementsLocation(GoogleNewsCrawlingParsingDrive):
 
     def search_box_page_type(self, xpath: str) -> Any:
         try:
+            print(f"{xpath} 요소로 탐색해봅니다")
             news_box_type: Any = WebDriverWait(self.driver, WAIT_TIME).until(
                 EC.presence_of_element_located((By.XPATH, xpath))
             )
+            if news_box_type:
+                print(f"사용한 xpath는 --> {xpath}")
             return news_box_type
-        except TimeoutException:
-            return None
+        except (TimeoutException, NoSuchElementException):
+            print("찾지 못했습니다 다른 location을 찾아봅니다")
 
     def handle_news_box_scenario(self, xpath: str) -> None:
         news_box = self.search_box_page_type(xpath)
@@ -121,10 +131,12 @@ class GoogleMovingElementsLocation(GoogleNewsCrawlingParsingDrive):
         self.driver.get(self.url)
 
         for xpath in [
-            GOOGLE_NEWS_TAB_XPATH1,
-            GOOGLE_NEWS_TAB_XPATH2,
-            GOOGLE_NEWS_TAB_XPATH3,
-            GOOGLE_NEWS_TAB_XPATH4,
+            # GOOGLE_NEWS_TAB_XPATH1,
+            # GOOGLE_NEWS_TAB_XPATH2,
+            # GOOGLE_NEWS_TAB_XPATH3,
+            # GOOGLE_NEWS_TAB_XPATH4,
+            # GOOGLE_NEWS_TAB_XPATH5,
+            GOOGLE_NEWS_TAB_XPATH6,
         ]:
             self.handle_news_box_scenario(xpath)
 
@@ -172,7 +184,7 @@ class BingMovingElementLocation(BingNewsCrawlingParsingDrive):
         self.count = count
         self.driver: webdriver.Remote = chrome_option_injection()
 
-    def repeat_scroll(self):
+    def repeat_scroll(self) -> None:
         self.driver.get(self.url)
         # 스크롤 내리기 전 위치
         scroll_location: int = self.driver.execute_script(
@@ -194,7 +206,7 @@ class BingMovingElementLocation(BingNewsCrawlingParsingDrive):
                     "return document.body.scrollHeight"
                 )
                 i += 1
-
+                print(i)
                 # page url
                 self.news_info_collect(self.driver.page_source)
                 # 늘어난 스크롤 위치와 이동 전 위치 같으면(더 이상 스크롤이 늘어나지 않으면) 종료

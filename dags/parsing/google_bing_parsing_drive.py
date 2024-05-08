@@ -3,8 +3,11 @@ Google Crawling Parsing Drive
 """
 
 import re
+from pathlib import Path
 from bs4 import BeautifulSoup
-from parsing.util.util_parser import soup_data, mysql_saving_hook
+from parsing.util.util_parser import soup_data, mysql_saving_hook, log
+
+path_location = Path(__file__).parent.parent.parent
 
 
 class GoogleNewsCrawlingParsingDrive:
@@ -125,7 +128,6 @@ class BingNewsCrawlingParsingDrive:
             elements={"class": "algocore"},
             soup=BeautifulSoup(html_source, "lxml"),
         )
-
         for div_1 in div_class_algocore:
             for div_2 in self.div_in_class(div_1):
                 url = div_2["url"]

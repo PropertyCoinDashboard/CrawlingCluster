@@ -15,8 +15,6 @@ services:
       - "4444:4444"
       - "5900:5900"
       - "7900:7900"
-    networks:
-      - airflow-network
 
   chromedriver:
     image: seleniarm/hub:latest
@@ -24,10 +22,4 @@ services:
     ports:
       - "4442:4442"
       - "4443:4443"
-    networks:
-      - airflow-network
-
-networks:
-  airflow-network:
-    external: true
 

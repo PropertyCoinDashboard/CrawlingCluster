@@ -4,6 +4,7 @@
 
 from typing import Any
 import time
+
 from airflow import DAG
 from airflow.utils.dates import days_ago
 from airflow.operators.python import PythonOperator
@@ -21,7 +22,7 @@ from parsing.selenium_parsing import (
 )
 
 
-# MySQL 연결 설정
+# # MySQL 연결 설정
 mysql_conn_id = "airflow-mysql"
 mysql_hook = MySqlHook(mysql_conn_id=mysql_conn_id)
 
@@ -91,7 +92,7 @@ with DAG(
     google_sel_operator = PythonOperator(
         task_id="get_news_api_google",
         python_callable=process_google,
-        op_kwargs={"target": "BTC", "count": 5},
+        op_kwargs={"target": "BTC", "count": 2},
         dag=dag,
     )
 
@@ -102,7 +103,7 @@ with DAG(
     bing_sel_operator = PythonOperator(
         task_id="get_news_api_bing",
         python_callable=process_bing,
-        op_kwargs={"target": "BTC", "count": 5},
+        op_kwargs={"target": "BTC", "count": 2},
         dag=dag,
     )
 

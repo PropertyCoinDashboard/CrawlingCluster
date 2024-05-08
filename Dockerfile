@@ -10,6 +10,6 @@ COPY requirements.txt ./requirements.txt
 # RUN apt-get update && apt-get install -y libgeos-dev && apt-get autoremove -yqq --purge && apt-get clean
 # RUN useradd -ms /bin/bash -d /home/airflow -g root -G sudo -p airflow airflow
 
-
 USER airflow
+
 RUN pip install -r ./requirements.txt
