@@ -5,7 +5,7 @@ Google Crawling Parsing Drive
 import re
 from pathlib import Path
 from bs4 import BeautifulSoup
-from parsing.util.util_parser import soup_data, mysql_saving_hook, log
+from parsing.util.util_parser import soup_data
 
 path_location = Path(__file__).parent.parent.parent
 
@@ -79,8 +79,9 @@ class GoogleNewsCrawlingParsingDrive:
                 for a_tag in self.div_a_tags(div_2):
                     title = self.href_from_text_preprocessing(a_tag.text)[:20]
                     url = a_tag["href"]
+                    print(title, url)
                     query = f'INSERT INTO dash.log(location, title, url) VALUES ("Google", "{title}", "{url}")'
-                    mysql_saving_hook(query)
+                    # mysql_saving_hook(query)
 
 
 class BingNewsCrawlingParsingDrive:
@@ -133,4 +134,5 @@ class BingNewsCrawlingParsingDrive:
                 url = div_2["url"]
                 title = self.href_from_text_preprocessing(div_2["data-title"][:20])
                 query = f'INSERT INTO dash.log(location, title, url) VALUES ("Bing", "{title}", "{url}")'
-                mysql_saving_hook(query)
+                print(url, title)
+                # mysql_saving_hook(query)

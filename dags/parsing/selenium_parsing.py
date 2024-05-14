@@ -24,16 +24,9 @@ from parsing.google_bing_parsing_drive import (
 )
 from parsing.util.util_parser import csv_saving
 from parsing.util._xpath_location import (
-    USERAGENT,
     WAIT_TIME,
     BITHUM_POPUP_BUTTON,
     SCROLL_ITERATIONS,
-    GOOGLE_NEWS_TAB_XPATH1,
-    GOOGLE_NEWS_TAB_XPATH2,
-    GOOGLE_NEWS_TAB_XPATH3,
-    GOOGLE_NEWS_TAB_XPATH4,
-    GOOGLE_NEWS_TAB_XPATH5,
-    GOOGLE_NEWS_TAB_XPATH6,
 )
 
 # Disable warnings for insecure requests
@@ -45,10 +38,10 @@ ua = UserAgent()
 def chrome_option_injection():
     # 크롬 옵션 설정
     option_chrome = uc.ChromeOptions()
-    option_chrome.add_argument("headless")
-    option_chrome.add_argument("disable-gpu")
-    option_chrome.add_argument("disable-infobars")
-    option_chrome.add_argument("--disable-extensions")
+    # option_chrome.add_argument("headless")
+    # option_chrome.add_argument("disable-gpu")
+    # option_chrome.add_argument("disable-infobars")
+    # option_chrome.add_argument("--disable-extensions")
     option_chrome.add_argument(f"user-agent={ua.random}")
     prefs: dict[str, dict[str, int]] = {
         "profile.default_content_setting_values": {
@@ -80,15 +73,15 @@ def chrome_option_injection():
     }
 
     option_chrome.add_experimental_option("prefs", prefs)
-    webdriver_remote = webdriver.Remote(
-        "http://chrome:4444/wd/hub", options=option_chrome
-    )
-    # from webdriver_manager.chrome import ChromeDriverManager
-    # from selenium.webdriver.chrome.service import Service as ChromeService
-
-    # webdriver_remote = webdriver.Chrome(
-    #     service=ChromeService(ChromeDriverManager().install()), options=option_chrome
+    # webdriver_remote = webdriver.Remote(
+    #     "http://0.0.0.0:4444/wd/hub", options=option_chrome
     # )
+    from webdriver_manager.chrome import ChromeDriverManager
+    from selenium.webdriver.chrome.service import Service as ChromeService
+
+    webdriver_remote = webdriver.Chrome(
+        service=ChromeService(ChromeDriverManager().install()), options=option_chrome
+    )
     return webdriver_remote
 
 
@@ -100,7 +93,7 @@ class GoogleMovingElementsLocation(GoogleNewsCrawlingParsingDrive):
     """
 
     def __init__(self, target: str, count: int) -> None:
-        self.url = f"https://www.google.com/search?q={target}"
+        self.url = f"https://www.google.com/search?q={target}&tbm=nws&gl=ko&hl=kr"
         self.driver = chrome_option_injection()
         self.count = count
 
@@ -116,12 +109,9 @@ class GoogleMovingElementsLocation(GoogleNewsCrawlingParsingDrive):
         except (TimeoutException, NoSuchElementException):
             print("찾지 못했습니다 다른 location을 찾아봅니다")
 
-    def handle_news_box_scenario(self, xpath: str) -> None:
-        news_box = self.search_box_page_type(xpath)
-        if news_box:
-            news_box.click()
-            self.page_scroll_moving()
-            self.next_page_moving()
+    def handle_news_box_scenario(self) -> None:
+        self.page_scroll_moving()
+        self.next_page_moving()
 
     def search_box(self) -> str:
         """
@@ -129,16 +119,7 @@ class GoogleMovingElementsLocation(GoogleNewsCrawlingParsingDrive):
         각 시나리오마다 Xpath를 각기 적용하여 회피하였음
         """
         self.driver.get(self.url)
-
-        for xpath in [
-            # GOOGLE_NEWS_TAB_XPATH1,
-            # GOOGLE_NEWS_TAB_XPATH2,
-            # GOOGLE_NEWS_TAB_XPATH3,
-            # GOOGLE_NEWS_TAB_XPATH4,
-            # GOOGLE_NEWS_TAB_XPATH5,
-            GOOGLE_NEWS_TAB_XPATH6,
-        ]:
-            self.handle_news_box_scenario(xpath)
+        self.handle_news_box_scenario()
 
     def page_scroll_moving(self) -> None:
         """
