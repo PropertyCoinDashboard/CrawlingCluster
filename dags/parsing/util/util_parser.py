@@ -80,7 +80,6 @@ def url_parsing(url: str, headers: dict[str, Any]):
     """
     url parsing
     """
-    # headers: dict[str, str] = {"accept": "application/json"}
     response = requests.get(url, headers=headers, timeout=60)
 
     match response.status_code:
@@ -90,43 +89,3 @@ def url_parsing(url: str, headers: dict[str, Any]):
             raise requests.exceptions.RequestException(
                 f"API Request에 실패하였습니다 status code --> {response.status_code}"
             )
-
-
-# API 호출해올 비동기 함수 (Naver, Daum)
-## 함수에 너무 많은 책임이 부여되어 있어 분할 필요성 느낌
-# def get_news_data(
-#     target: str,
-#     items: str,
-#     titles: str,
-#     link: str,
-#     target_url: str,
-#     build_header: dict[str, str],
-# ):
-#     """new parsing
-
-#     Args:
-#         target (str): 타겟 API
-#         items (str): 첫번째 접근
-#         title (str): 타이틀
-#         link (str): url
-#         target_url (str): 파싱하려는 API
-#         build_header (dict[str, str]): 인증 헤더값
-
-#     Returns:
-#         _type_: str
-#     """
-#     logger = log(f"{target}", f"{path_location}/log/info.log")
-#     res_data: Any = url_parsing(target_url, build_header)
-
-#     count = 0
-#     for item in res_data[items]:
-#         title = item[titles][:20]
-#         url = item[link]
-#         count += 1
-
-#         query = f'INSERT INTO dash.log(location, title, url) VALUES ("{target}", "{title}", "{url}")'
-#         mysql_saving_hook(query)
-#         logger.info("%s Title: %s", target, title)
-#         logger.info("%s URL: %s", target, url)
-#         logger.info("--------------------")
-#     logger.info("%s parsing data --> %s", target, count)

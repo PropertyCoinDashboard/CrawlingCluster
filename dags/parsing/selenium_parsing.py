@@ -17,15 +17,12 @@ from selenium.common.exceptions import (
 from fake_useragent import UserAgent
 
 
-from parsing.coin_parsing_drive import korbit_parsing_page, bithum_parsing_page
 from parsing.google_bing_parsing_drive import (
     GoogleNewsCrawlingParsingDrive,
     BingNewsCrawlingParsingDrive,
 )
-from parsing.util.util_parser import csv_saving
 from parsing.util._xpath_location import (
     WAIT_TIME,
-    BITHUM_POPUP_BUTTON,
     SCROLL_ITERATIONS,
 )
 
@@ -187,7 +184,6 @@ class BingMovingElementLocation(BingNewsCrawlingParsingDrive):
                     "return document.body.scrollHeight"
                 )
                 i += 1
-                print(i)
                 # page url
                 self.news_info_collect(self.driver.page_source)
                 # 늘어난 스크롤 위치와 이동 전 위치 같으면(더 이상 스크롤이 늘어나지 않으면) 종료
@@ -204,50 +200,3 @@ class BingMovingElementLocation(BingNewsCrawlingParsingDrive):
             self.driver.quit()
         except InvalidSessionIdException:
             pass
-
-
-class KorbitSymbolParsingUtility:
-    """Korbit 심볼
-
-    Args:
-        SeleniumUtility (_type_): 유틸리티 클래스
-    """
-
-    def __init__(self) -> None:
-        self.url = "https://www.korbit.co.kr/market"
-        self.driver: webdriver.Remote = chrome_option_injection()
-
-    def korbit_page(self) -> None:
-        """
-        url parsing
-        """
-        self.driver.get(self.url)
-        time.sleep(2)
-        symbol = korbit_parsing_page(html_data=self.driver.page_source)
-        csv_saving(data=symbol, csv_file_name="korbit.csv")
-
-
-class BithumSymbolParsingUtility:
-    """빗썸 심볼
-
-    Args:
-        SeleniumUtility (_type_): 유틸리티 클래스
-    """
-
-    def __init__(self, driver) -> None:
-        self.url = "https://www.bithumb.com/react/"
-        self.driver: webdriver.Remote = chrome_option_injection()
-
-    def close_bit_page_and_get_source(self) -> None:
-        """
-        url parsing
-        """
-        self.driver.get(url=self.url)
-        try:
-            pop_up_button = WebDriverWait(self.driver, WAIT_TIME).until(
-                EC.presence_of_element_located((By.XPATH, BITHUM_POPUP_BUTTON))
-            )
-            pop_up_button.click()
-        except TimeoutException:
-            symbol = bithum_parsing_page(html_data=self.driver.page_source)
-            csv_saving(data=symbol, csv_file_name="bithum.csv")
