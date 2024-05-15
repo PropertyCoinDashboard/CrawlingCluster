@@ -1,7 +1,8 @@
 import time
 import urllib3
 
-from typing import Any
+
+from typing import Any, Callable
 from urllib3 import exceptions
 
 import undetected_chromedriver as uc
@@ -94,29 +95,10 @@ class GoogleMovingElementsLocation(GoogleNewsCrawlingParsingDrive):
         self.driver = chrome_option_injection()
         self.count = count
 
-    def search_box_page_type(self, xpath: str) -> Any:
-        try:
-            print(f"{xpath} 요소로 탐색해봅니다")
-            news_box_type: Any = WebDriverWait(self.driver, WAIT_TIME).until(
-                EC.presence_of_element_located((By.XPATH, xpath))
-            )
-            if news_box_type:
-                print(f"사용한 xpath는 --> {xpath}")
-            return news_box_type
-        except (TimeoutException, NoSuchElementException):
-            print("찾지 못했습니다 다른 location을 찾아봅니다")
-
-    def handle_news_box_scenario(self) -> None:
+    def search_box(self) -> None:
+        self.driver.get(self.url)
         self.page_scroll_moving()
         self.next_page_moving()
-
-    def search_box(self) -> str:
-        """
-        google 자동화할시 3가지 컨셉의 html이 있는걸 확인하여
-        각 시나리오마다 Xpath를 각기 적용하여 회피하였음
-        """
-        self.driver.get(self.url)
-        self.handle_news_box_scenario()
 
     def page_scroll_moving(self) -> None:
         """
@@ -130,24 +112,44 @@ class GoogleMovingElementsLocation(GoogleNewsCrawlingParsingDrive):
             scroll_cal: int = prev_height / SCROLL_ITERATIONS * i
             self.driver.execute_script(f"window.scrollTo(0, {scroll_cal})")
 
+    def search_box_page_type(self, xpath: str) -> Any:
+        news_box_type: Any = WebDriverWait(self.driver, WAIT_TIME).until(
+            EC.presence_of_element_located((By.XPATH, xpath))
+        )
+        return news_box_type
+
+    def a_loop_page(
+        self, start: int, count: int, xpath_type: Callable[[int], str]
+    ) -> None:
+
+        for i in range(start, self.count + count):
+            next_page_button: Any = self.search_box_page_type(xpath_type(i))
+            self.news_info_collect(self.driver.page_source)
+            print(f"{i-1}page로 이동합니다 --> {xpath_type(i)} 이용합니다")
+            next_page_button.click()
+            time.sleep(5)
+            self.page_scroll_moving()
+        else:
+            print("모든 수집 종료")
+            self.driver.quit()
+
     def next_page_moving(self) -> None:
         """
         다음페이지로 넘어가기
         """
+
+        def mo_xpath_injection(start: int) -> str:
+            if start == 2:
+                return f'//*[@id="wepR4d"]/div/span/a'
+            return f'//*[@id="wepR4d"]/div/span/a[{start-1}]'
+
+        def pa_xpath_injection(start: int) -> str:
+            return f'//*[@id="botstuff"]/div/div[3]/table/tbody/tr/td[{start}]/a'
+
         try:
-            for i in range(3, self.count + 1):
-                next_page_button = self.search_box_page_type(
-                    f'//*[@id="botstuff"]/div/div[3]/table/tbody/tr/td[{i}]/a'
-                )
-                if next_page_button:
-                    self.news_info_collect(self.driver.page_source)
-                    next_page_button.click()
-                    time.sleep(5)
-                    self.page_scroll_moving()
-            time.sleep(3)
-            self.driver.quit()
-        except InvalidSessionIdException:
-            pass
+            self.a_loop_page(3, 3, pa_xpath_injection)
+        except (NoSuchElementException, TimeoutException):
+            self.a_loop_page(2, 2, mo_xpath_injection)
 
 
 class BingMovingElementLocation(BingNewsCrawlingParsingDrive):

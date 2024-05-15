@@ -10,7 +10,6 @@ import requests
 import pandas as pd
 
 from bs4 import BeautifulSoup
-from parsing.util.create_log import log
 
 # from airflow.providers.mysql.hooks.mysql import MySqlHook
 
