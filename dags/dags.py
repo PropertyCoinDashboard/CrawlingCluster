@@ -17,13 +17,11 @@ def process_bing(target: str, count: int) -> None:
     BingMovingElementLocation(target, count).repeat_scroll()
 
 
-process_google("BTC", 2)
+with ThreadPoolExecutor(2) as poll:
+    task = [
+        poll.submit(process_google, "BTC", 2),
+        poll.submit(process_bing, "BTC", 2),
+    ]
 
-# with ThreadPoolExecutor(2) as poll:
-#     task = [
-#         poll.submit(process_google, "BTC", 3),
-#         poll.submit(process_bing, "BTC", 2),
-#     ]
-
-#     for data in as_completed(task):
-#         data.result()
+    for data in as_completed(task):
+        data.result()

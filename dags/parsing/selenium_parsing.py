@@ -118,11 +118,9 @@ class GoogleMovingElementsLocation(GoogleNewsCrawlingParsingDrive):
         )
         return news_box_type
 
-    def a_loop_page(
-        self, start: int, count: int, xpath_type: Callable[[int], str]
-    ) -> None:
+    def a_loop_page(self, start: int, xpath_type: Callable[[int], str]) -> None:
 
-        for i in range(start, self.count + count):
+        for i in range(start, self.count + start):
             next_page_button: Any = self.search_box_page_type(xpath_type(i))
             self.news_info_collect(self.driver.page_source)
             print(f"{i-1}page로 이동합니다 --> {xpath_type(i)} 이용합니다")
@@ -130,7 +128,7 @@ class GoogleMovingElementsLocation(GoogleNewsCrawlingParsingDrive):
             time.sleep(5)
             self.page_scroll_moving()
         else:
-            print("모든 수집 종료")
+            print("google 수집 종료")
             self.driver.quit()
 
     def next_page_moving(self) -> None:
@@ -147,9 +145,9 @@ class GoogleMovingElementsLocation(GoogleNewsCrawlingParsingDrive):
             return f'//*[@id="botstuff"]/div/div[3]/table/tbody/tr/td[{start}]/a'
 
         try:
-            self.a_loop_page(3, 3, pa_xpath_injection)
+            self.a_loop_page(3, pa_xpath_injection)
         except (NoSuchElementException, TimeoutException):
-            self.a_loop_page(2, 2, mo_xpath_injection)
+            self.a_loop_page(2, mo_xpath_injection)
 
 
 class BingMovingElementLocation(BingNewsCrawlingParsingDrive):
