@@ -91,11 +91,22 @@ class GoogleMovingElementsLocation(GoogleNewsCrawlingParsingDrive):
     """
 
     def __init__(self, target: str, count: int) -> None:
+        """
+        Args:
+            target (str): 검색 타겟
+            count (int): 얼마나 수집할껀지
+        """
         self.url = f"https://www.google.com/search?q={target}&tbm=nws&gl=ko&hl=kr"
-        self.driver = chrome_option_injection()
+        self.driver: webdriver.Chrome = chrome_option_injection()
         self.count = count
 
     def search_box(self) -> None:
+        """수집 시작점
+        - self.page_scroll_moving()
+            - page 내리기
+        - self.next_page_moving()
+            - 다음 page 이동
+        """
         self.driver.get(self.url)
         self.page_scroll_moving()
         self.next_page_moving()
@@ -113,13 +124,19 @@ class GoogleMovingElementsLocation(GoogleNewsCrawlingParsingDrive):
             self.driver.execute_script(f"window.scrollTo(0, {scroll_cal})")
 
     def search_box_page_type(self, xpath: str) -> Any:
+        """xpath 요소 찾기"""
         news_box_type: Any = WebDriverWait(self.driver, WAIT_TIME).until(
             EC.presence_of_element_located((By.XPATH, xpath))
         )
         return news_box_type
 
     def a_loop_page(self, start: int, xpath_type: Callable[[int], str]) -> None:
+        """페이지 수집하면서 이동
 
+        Args:
+            start (int): 페이지 이동 시작 html location
+            xpath_type (Callable[[int], str]): google은 여러 HTML 이므로 회피 목적으로 xpath 함수를 만듬
+        """
         for i in range(start, self.count + start):
             next_page_button: Any = self.search_box_page_type(xpath_type(i))
             self.news_info_collect(self.driver.page_source)
@@ -132,18 +149,19 @@ class GoogleMovingElementsLocation(GoogleNewsCrawlingParsingDrive):
             self.driver.quit()
 
     def next_page_moving(self) -> None:
-        """
-        다음페이지로 넘어가기
-        """
+        """페이지 수집 이동 본체"""
 
         def mo_xpath_injection(start: int) -> str:
+            """google mobile xpath 경로 start는 a tag 기점 a -> a[2]"""
             if start == 2:
                 return f'//*[@id="wepR4d"]/div/span/a'
             return f'//*[@id="wepR4d"]/div/span/a[{start-1}]'
 
         def pa_xpath_injection(start: int) -> str:
+            """google site xpath 경로 start는 tr/td[3](page 2) ~ 기점"""
             return f'//*[@id="botstuff"]/div/div[3]/table/tbody/tr/td[{start}]/a'
 
+        # 실행시작 지점
         try:
             self.a_loop_page(3, pa_xpath_injection)
         except (NoSuchElementException, TimeoutException):
@@ -158,6 +176,11 @@ class BingMovingElementLocation(BingNewsCrawlingParsingDrive):
     """
 
     def __init__(self, target: str, count: int) -> None:
+        """
+        Args:
+            target (str): 검색 타겟
+            count (int): 얼마나 수집할껀지
+        """
         self.url = f"https://www.bing.com/news/search?q={target}"
         self.count = count
         self.driver: webdriver.Remote = chrome_option_injection()
