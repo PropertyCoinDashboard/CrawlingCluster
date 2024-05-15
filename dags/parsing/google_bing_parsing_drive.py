@@ -129,8 +129,8 @@ class BingNewsCrawlingParsingDrive:
         self, html_source: str, *element: tuple[str]
     ) -> tuple[str, str]:
         pattern = r'class="([^"]+)"'
-        class_values = set(element for element in re.findall(pattern, html_source))
-        data = tuple(elem for elem in element if elem in class_values)
+        class_values: set[str] = set(element for element in re.findall(pattern, html_source))
+        data: tuple[str] = tuple(elem for elem in element if elem in class_values)
         return data
 
     def news_info_collect(self, html_source: str) -> None:
