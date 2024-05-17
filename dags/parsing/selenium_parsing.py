@@ -1,8 +1,10 @@
 import time
 import urllib3
 
-from typing import Any
+
+from typing import Any, Callable
 from urllib3 import exceptions
+from collections import deque
 
 import undetected_chromedriver as uc
 from selenium import webdriver
@@ -13,27 +15,17 @@ from selenium.common.exceptions import (
     InvalidSessionIdException,
     TimeoutException,
     NoSuchElementException,
+    WebDriverException,
 )
 from fake_useragent import UserAgent
 
-
-from parsing.coin_parsing_drive import korbit_parsing_page, bithum_parsing_page
 from parsing.google_bing_parsing_drive import (
     GoogleNewsCrawlingParsingDrive,
     BingNewsCrawlingParsingDrive,
 )
-from parsing.util.util_parser import csv_saving
 from parsing.util._xpath_location import (
-    USERAGENT,
     WAIT_TIME,
-    BITHUM_POPUP_BUTTON,
     SCROLL_ITERATIONS,
-    GOOGLE_NEWS_TAB_XPATH1,
-    GOOGLE_NEWS_TAB_XPATH2,
-    GOOGLE_NEWS_TAB_XPATH3,
-    GOOGLE_NEWS_TAB_XPATH4,
-    GOOGLE_NEWS_TAB_XPATH5,
-    GOOGLE_NEWS_TAB_XPATH6,
 )
 
 # Disable warnings for insecure requests
@@ -47,8 +39,11 @@ def chrome_option_injection():
     option_chrome = uc.ChromeOptions()
     option_chrome.add_argument("headless")
     option_chrome.add_argument("disable-gpu")
-    option_chrome.add_argument("disable-infobars")
+    option_chrome.add_argument("--disable-infobars")
     option_chrome.add_argument("--disable-extensions")
+    option_chrome.add_argument("--disable-gpu")
+    option_chrome.add_argument("--no-sandbox")
+    option_chrome.add_argument("--disable-dev-shm-usage")
     option_chrome.add_argument(f"user-agent={ua.random}")
     prefs: dict[str, dict[str, int]] = {
         "profile.default_content_setting_values": {
@@ -80,15 +75,15 @@ def chrome_option_injection():
     }
 
     option_chrome.add_experimental_option("prefs", prefs)
-    webdriver_remote = webdriver.Remote(
-        "http://chrome:4444/wd/hub", options=option_chrome
-    )
-    # from webdriver_manager.chrome import ChromeDriverManager
-    # from selenium.webdriver.chrome.service import Service as ChromeService
-
-    # webdriver_remote = webdriver.Chrome(
-    #     service=ChromeService(ChromeDriverManager().install()), options=option_chrome
+    # webdriver_remote = webdriver.Remote(
+    #     "http://0.0.0.0:4444/wd/hub", options=option_chrome
     # )
+    from webdriver_manager.chrome import ChromeDriverManager
+    from selenium.webdriver.chrome.service import Service as ChromeService
+
+    webdriver_remote = webdriver.Chrome(
+        service=ChromeService(ChromeDriverManager().install()), options=option_chrome
+    )
     return webdriver_remote
 
 
@@ -100,45 +95,14 @@ class GoogleMovingElementsLocation(GoogleNewsCrawlingParsingDrive):
     """
 
     def __init__(self, target: str, count: int) -> None:
-        self.url = f"https://www.google.com/search?q={target}"
-        self.driver = chrome_option_injection()
+        """
+        Args:
+            target (str): 검색 타겟
+            count (int): 얼마나 수집할껀지
+        """
+        self.url = f"https://www.google.com/search?q={target}&tbm=nws&gl=ko&hl=kr"
+        self.driver: webdriver.Chrome = chrome_option_injection()
         self.count = count
-
-    def search_box_page_type(self, xpath: str) -> Any:
-        try:
-            print(f"{xpath} 요소로 탐색해봅니다")
-            news_box_type: Any = WebDriverWait(self.driver, WAIT_TIME).until(
-                EC.presence_of_element_located((By.XPATH, xpath))
-            )
-            if news_box_type:
-                print(f"사용한 xpath는 --> {xpath}")
-            return news_box_type
-        except (TimeoutException, NoSuchElementException):
-            print("찾지 못했습니다 다른 location을 찾아봅니다")
-
-    def handle_news_box_scenario(self, xpath: str) -> None:
-        news_box = self.search_box_page_type(xpath)
-        if news_box:
-            news_box.click()
-            self.page_scroll_moving()
-            self.next_page_moving()
-
-    def search_box(self) -> str:
-        """
-        google 자동화할시 3가지 컨셉의 html이 있는걸 확인하여
-        각 시나리오마다 Xpath를 각기 적용하여 회피하였음
-        """
-        self.driver.get(self.url)
-
-        for xpath in [
-            # GOOGLE_NEWS_TAB_XPATH1,
-            # GOOGLE_NEWS_TAB_XPATH2,
-            # GOOGLE_NEWS_TAB_XPATH3,
-            # GOOGLE_NEWS_TAB_XPATH4,
-            # GOOGLE_NEWS_TAB_XPATH5,
-            GOOGLE_NEWS_TAB_XPATH6,
-        ]:
-            self.handle_news_box_scenario(xpath)
 
     def page_scroll_moving(self) -> None:
         """
@@ -152,24 +116,72 @@ class GoogleMovingElementsLocation(GoogleNewsCrawlingParsingDrive):
             scroll_cal: int = prev_height / SCROLL_ITERATIONS * i
             self.driver.execute_script(f"window.scrollTo(0, {scroll_cal})")
 
-    def next_page_moving(self) -> None:
+    def search_box_page_type(self, xpath: str) -> Any:
+        """xpath 요소 찾기"""
+        news_box_type: Any = WebDriverWait(self.driver, WAIT_TIME).until(
+            EC.presence_of_element_located((By.XPATH, xpath))
+        )
+        return news_box_type
+
+    def a_loop_page(
+        self, start: int, xpath_type: Callable[[int], str]
+    ) -> deque[list[str]]:
+        """페이지 수집하면서 이동
+
+        Args:
+            start (int): 페이지 이동 시작 html location
+            xpath_type (Callable[[int], str]): google은 여러 HTML 이므로 회피 목적으로 xpath 함수를 만듬
         """
-        다음페이지로 넘어가기
-        """
-        try:
-            for i in range(3, self.count + 1):
-                next_page_button = self.search_box_page_type(
-                    f'//*[@id="botstuff"]/div/div[3]/table/tbody/tr/td[{i}]/a'
-                )
-                if next_page_button:
-                    self.news_info_collect(self.driver.page_source)
-                    next_page_button.click()
-                    time.sleep(5)
-                    self.page_scroll_moving()
-            time.sleep(3)
+        data = deque()
+        for i in range(start, self.count + start):
+            try:
+                next_page_button: Any = self.search_box_page_type(xpath_type(i))
+                print(f"{i}page로 이동합니다 --> {xpath_type(i)} 이용합니다")
+                url_data: list[str] = self.news_info_collect(self.driver.page_source)
+                data.append(url_data)
+                next_page_button.click()
+                time.sleep(5)
+                self.page_scroll_moving()
+            except WebDriverException as e:
+                print(e)
+                print(f"다음과 같은 이유로 google 수집 종료 --> {e}")
+                self.driver.quit()
+                return data
+        else:
+            print("google 수집 종료")
             self.driver.quit()
-        except InvalidSessionIdException:
-            pass
+        return data
+
+    def next_page_moving(self) -> deque[list[str]]:
+        """페이지 수집 이동 본체"""
+
+        def mo_xpath_injection(start: int) -> str:
+            """google mobile xpath 경로 start는 a tag 기점 a -> a[2]"""
+            if start == 2:
+                return f'//*[@id="wepR4d"]/div/span/a'
+            return f'//*[@id="wepR4d"]/div/span/a[{start-1}]'
+
+        def pa_xpath_injection(start: int) -> str:
+            """google site xpath 경로 start는 tr/td[3](page 2) ~ 기점"""
+            return f'//*[@id="botstuff"]/div/div[3]/table/tbody/tr/td[{start}]/a'
+
+        # 실행시작 지점
+        self.driver.get(self.url)
+        try:
+            return self.a_loop_page(3, pa_xpath_injection)
+        except (NoSuchElementException, TimeoutException):
+            return self.a_loop_page(2, mo_xpath_injection)
+
+    def search_box(self) -> deque[list[str]]:
+        """수집 시작점
+        - self.page_scroll_moving()
+            - page 내리기
+        - self.next_page_moving()
+            - 다음 page 이동
+        """
+        self.driver.get(self.url)
+        self.page_scroll_moving()
+        return self.next_page_moving()
 
 
 class BingMovingElementLocation(BingNewsCrawlingParsingDrive):
@@ -180,11 +192,17 @@ class BingMovingElementLocation(BingNewsCrawlingParsingDrive):
     """
 
     def __init__(self, target: str, count: int) -> None:
+        """
+        Args:
+            target (str): 검색 타겟
+            count (int): 얼마나 수집할껀지
+        """
         self.url = f"https://www.bing.com/news/search?q={target}"
         self.count = count
         self.driver: webdriver.Remote = chrome_option_injection()
 
     def repeat_scroll(self) -> None:
+        """Bing은 무한 스크롤이기에 횟수만큼 페이지를 내리도록 하였음"""
         self.driver.get(self.url)
         # 스크롤 내리기 전 위치
         scroll_location: int = self.driver.execute_script(
@@ -192,6 +210,7 @@ class BingMovingElementLocation(BingNewsCrawlingParsingDrive):
         )
         try:
             i = 0
+            data = deque()
             while i < self.count:
                 # 현재 스크롤의 가장 아래로 내림
                 self.driver.execute_script(
@@ -206,9 +225,10 @@ class BingMovingElementLocation(BingNewsCrawlingParsingDrive):
                     "return document.body.scrollHeight"
                 )
                 i += 1
-                print(i)
                 # page url
-                self.news_info_collect(self.driver.page_source)
+                url_element: list[str] = self.news_info_collect(self.driver.page_source)
+                data.append(url_element)
+
                 # 늘어난 스크롤 위치와 이동 전 위치 같으면(더 이상 스크롤이 늘어나지 않으면) 종료
                 if scroll_location == scroll_height:
                     break
@@ -220,53 +240,9 @@ class BingMovingElementLocation(BingNewsCrawlingParsingDrive):
                         "return document.body.scrollHeight"
                     )
             time.sleep(3)
-            self.driver.quit()
+            return data
         except InvalidSessionIdException:
             pass
-
-
-class KorbitSymbolParsingUtility:
-    """Korbit 심볼
-
-    Args:
-        SeleniumUtility (_type_): 유틸리티 클래스
-    """
-
-    def __init__(self) -> None:
-        self.url = "https://www.korbit.co.kr/market"
-        self.driver: webdriver.Remote = chrome_option_injection()
-
-    def korbit_page(self) -> None:
-        """
-        url parsing
-        """
-        self.driver.get(self.url)
-        time.sleep(2)
-        symbol = korbit_parsing_page(html_data=self.driver.page_source)
-        csv_saving(data=symbol, csv_file_name="korbit.csv")
-
-
-class BithumSymbolParsingUtility:
-    """빗썸 심볼
-
-    Args:
-        SeleniumUtility (_type_): 유틸리티 클래스
-    """
-
-    def __init__(self, driver) -> None:
-        self.url = "https://www.bithumb.com/react/"
-        self.driver: webdriver.Remote = chrome_option_injection()
-
-    def close_bit_page_and_get_source(self) -> None:
-        """
-        url parsing
-        """
-        self.driver.get(url=self.url)
-        try:
-            pop_up_button = WebDriverWait(self.driver, WAIT_TIME).until(
-                EC.presence_of_element_located((By.XPATH, BITHUM_POPUP_BUTTON))
-            )
-            pop_up_button.click()
-        except TimeoutException:
-            symbol = bithum_parsing_page(html_data=self.driver.page_source)
-            csv_saving(data=symbol, csv_file_name="bithum.csv")
+        finally:
+            print("Bing 수집 종료")
+            self.driver.quit()

@@ -1,125 +1,115 @@
 """
 기능 테스트
+Airflow 발전시키기
 """
 
-from typing import Any
-import time
-
-from airflow import DAG
-from airflow.utils.dates import days_ago
-from airflow.operators.python import PythonOperator
-from airflow.operators.bash import BashOperator
-from airflow.providers.mysql.hooks.mysql import MySqlHook
-
-from parsing.naver_daum_news_api import (
-    NaverNewsParsingDriver,
-    DaumNewsParsingDriver,
-)
-
+import requests
+from typing import Callable
+from collections import deque
+from parsing.util.util_parser import data_structure
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from parsing.selenium_parsing import (
     GoogleMovingElementsLocation,
     BingMovingElementLocation,
 )
 
 
-# # MySQL 연결 설정
-mysql_conn_id = "airflow-mysql"
-mysql_hook = MySqlHook(mysql_conn_id=mysql_conn_id)
+# 머금고 있어야함
+def indstrict(
+    page: Callable[[str, int], deque[list[str]]], target: str, counting: int
+) -> dict[int, dict[int, list[str]]]:
+    data = data_structure()
+    count = 1
+
+    # 요소가 들어올때마다 머금고 있어야함
+    url = page(target, counting)
+    while len(url) > 0:
+        url_data = url.popleft()
+        if count >= 9:
+            first = 4
+        elif count >= 7:
+            first = 3
+        elif count >= 5:
+            first = 2
+        else:
+            first = 1
+
+        if url_data not in data[first][count]:
+            data[first][count] = url_data
+
+        count += 1
+
+    return data
 
 
-def naver(count: int, target: str) -> None:
-    NaverNewsParsingDriver(count, target).get_naver_news_data(),
+# BFS 함수 정의
+import time
 
 
-def daum(count: int, target: str) -> None:
-    DaumNewsParsingDriver(count, target).get_daum_news_data(),
+def iterative_bfs(start_v: int, graph: dict[int, list[str]], target: str) -> None:
+    visited = set()
+    queue = deque([start_v])
+    visited.add(start_v)
+    while queue:
+        node = queue.popleft()
+        time.sleep(1)
+        for neighbor in graph.get(node, []):
+            time.sleep(1)
+            print(
+                f"BFS visiting node: {target} -- {node} -- {neighbor[:20]} -> {requests.get(neighbor).status_code}"
+            )
+            if neighbor not in visited:
+                visited.add(neighbor)
+                queue.append(neighbor)
 
 
-def process_google(**kwargs) -> Any:
-    return GoogleMovingElementsLocation(kwargs["target"], kwargs["count"]).search_box()
+# DFS 함수 정의
+def recursive_dfs(
+    node: int, graph: dict[int, dict[int, list[str]]], discovered: list[int] = None
+) -> list[int]:
+    if discovered is None:
+        discovered = []
+
+    discovered.append(node)
+    for n in graph.get(node, []):
+        if n not in discovered:
+            recursive_dfs(n, graph, discovered)
+
+    return discovered
 
 
-def process_bing(**kwargs) -> Any:
-    return BingMovingElementLocation(kwargs["target"], kwargs["count"]).repeat_scroll()
+def process_bing(target: str, count: int) -> None:
+    return BingMovingElementLocation(target, count).repeat_scroll()
 
 
-def driver_sleep():
-    time.sleep(30)
+def process_google(target: str, count: int) -> deque[list[str]]:
+    return GoogleMovingElementsLocation(target, count).search_box()
 
 
-with DAG(
-    dag_id="Crawling_data_API", start_date=days_ago(5), schedule_interval=None
-) as dag:
-
-    start_operator = BashOperator(
-        task_id="News_API_start", bash_command="echo crawling start!!", dag=dag
-    )
-
-    naver_api_operator = PythonOperator(
-        task_id="get_news_api_naver",
-        python_callable=naver,
-        op_args=[10, "BTC"],
-        dag=dag,
-    )
-
-    daum_api_operator = PythonOperator(
-        task_id="get_news_api_daum",
-        python_callable=daum,
-        op_args=[10, "BTC"],
-        dag=dag,
-    )
-
-    saving_operator = BashOperator(
-        task_id="News_API_saving", bash_command="echo saving complete!!", dag=dag
-    )
-
-    end_operator = BashOperator(
-        task_id="News_API_end", bash_command="echo end complete!!", dag=dag
-    )
-
-    start_operator >> naver_api_operator >> saving_operator >> end_operator
-    start_operator >> daum_api_operator >> saving_operator >> end_operator
+def deep_dive_search(
+    page: Callable[[str, int], deque[list[str]]],
+    target: str,
+    counting: int,
+    objection: str,
+):
+    tree = indstrict(page, target, counting)
+    dfs = recursive_dfs(1, tree)
+    print(f"{objection}의 검색된 노드의 순서 --> {dfs}")
+    print(f"{objection} 탐색 시작합니다")
+    for data in dfs:
+        try:
+            element = tree[data]
+            for num in element.keys():
+                iterative_bfs(num, element, objection)
+        except KeyError:
+            continue
 
 
-with DAG(
-    dag_id="Crawling_data_Selenium", start_date=days_ago(5), schedule_interval=None
-) as dag:
+with ThreadPoolExecutor(2) as poll:
+    task = [
+        poll.submit(deep_dive_search, process_google, "BTC", 10, "google"),
+        poll.submit(deep_dive_search, process_bing, "BTC", 10, "bing"),
+    ]
 
-    start_operator = BashOperator(
-        task_id="News_API_start", bash_command="echo crawling start!!", dag=dag
-    )
-
-    google_sel_operator = PythonOperator(
-        task_id="get_news_api_google",
-        python_callable=process_google,
-        op_kwargs={"target": "BTC", "count": 2},
-        dag=dag,
-    )
-
-    sleep_driver_operator = PythonOperator(
-        task_id="driver_sleep", python_callable=driver_sleep, dag=dag
-    )
-
-    bing_sel_operator = PythonOperator(
-        task_id="get_news_api_bing",
-        python_callable=process_bing,
-        op_kwargs={"target": "BTC", "count": 2},
-        dag=dag,
-    )
-
-    saving_operator = BashOperator(
-        task_id="News_API_saving", bash_command="echo saving complete!!", dag=dag
-    )
-
-    end_operator = BashOperator(
-        task_id="News_API_end", bash_command="echo end complete!!", dag=dag
-    )
-
-    (
-        start_operator
-        >> google_sel_operator
-        >> sleep_driver_operator
-        >> bing_sel_operator
-        >> saving_operator
-        >> end_operator
-    )
+    for data in as_completed(task):
+        data.result()
