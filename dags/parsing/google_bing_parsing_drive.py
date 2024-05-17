@@ -4,6 +4,7 @@ Google Crawling Parsing Drive
 
 import re
 from bs4 import BeautifulSoup
+from parsing.selenium_parsing import GoogleMovingElementsLocation
 from parsing.util.util_parser import soup_data
 
 
@@ -30,14 +31,14 @@ def href_from_a_tag(a_tag: BeautifulSoup, element: str) -> str:
     return a_tag.get(element)
 
 
-class GoogleNewsCrawlingParsingDrive:
+class GoogleNewsCrawlingParsingDrive(GoogleMovingElementsLocation):
     """
     Google News Parsing Drive
 
     """
 
-    def __init__(self) -> None:
-        self.processed_urls = set()  # 이미 처리된 URL을 추적하기 위한 세트
+    def __init__(self, target: str, count: int) -> None:
+        super().__init__(target, count)
 
     def div_in_class(self, element: BeautifulSoup) -> list[str]:
         """google page 요소 두번째 접근 단계
@@ -63,7 +64,7 @@ class GoogleNewsCrawlingParsingDrive:
         """
         return div_2.find_all("a", {"jsname": "YKoRaf"})
 
-    def news_info_collect(self, html_source: str) -> None:
+    def news_info_collect(self, html_source: str) -> list[str]:
         """요소 추출 시작점
 
         Args:
@@ -71,20 +72,26 @@ class GoogleNewsCrawlingParsingDrive:
         """
         # 첫번쨰 요소 접근  -> <div data-hveid="CA~QHw">
         # 요소별 무작위 난수이므로 정규표현식 사용
-        div_in_data_hveid: list = soup_data(
-            html_data=html_source,
-            element="div",
-            elements={
-                "data-hveid": re.compile(r"CA|QHw|CA[0-9a-zA-Z]+|CB[0-9a-zA-Z]+")
-            },
-            soup=BeautifulSoup(html_source, "lxml"),
-        )
-        for div_1 in div_in_data_hveid:
-            for div_2 in self.div_in_class(div_1):
-                for a_tag in self.div_a_tags(div_2):
-                    url = href_from_a_tag(a_tag, "href")
-                    title = href_from_text_preprocessing(a_tag.text)[:20]
-                    print(url, title)
+        element = []
+        for data in html_source:
+            div_in_data_hveid: list = soup_data(
+                html_data=data,
+                element="div",
+                elements={
+                    "data-hveid": re.compile(r"CA|QHw|CA[0-9a-zA-Z]+|CB[0-9a-zA-Z]+")
+                },
+                soup=BeautifulSoup(data, "lxml"),
+            )
+            for div_1 in div_in_data_hveid:
+                for div_2 in self.div_in_class(div_1):
+                    for a_tag in self.div_a_tags(div_2):
+                        url = href_from_a_tag(a_tag, "href")
+                        title = href_from_text_preprocessing(a_tag.text)[:20]
+                        element.append(url)
+                    return element
+
+    def saerch_start(self):
+        return self.news_info_collect(self.next_page_moving())
 
 
 class BingNewsCrawlingParsingDrive:
@@ -150,15 +157,19 @@ class BingNewsCrawlingParsingDrive:
             "algocore",
             "news-card newsitem cardcommon",
         )
+        print(f"Bing 다음요소로 수집 진행합니다 --> {detect}")
         div_class_algocore: list = soup_data(
             html_data=html_source,
             element="div",
             elements={"class": detect[0]},
             soup=BeautifulSoup(html_source, "lxml"),
         )
-
+        
+        data = []
         for div_1 in div_class_algocore:
             for div_2 in self.div_in_class(div_1, detect[1]):
                 url = href_from_a_tag(div_2, "url")
                 title = href_from_text_preprocessing(div_2["data-title"][:20])
-                print(url, title)
+                data.append(url)
+        print(data)
+        return data

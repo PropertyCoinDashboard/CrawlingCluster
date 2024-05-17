@@ -22,6 +22,28 @@ path_location = Path(__file__).parent.parent.parent
 #     mysql_hook.run(query)
 
 
+# 데이터 정의
+
+
+def data_structure() -> dict[int, dict[int, list[str]]]:
+    return {
+        i: (
+            {j: [] for j in range(1, 5)}
+            if i == 1
+            else (
+                {j: [] for j in range(5, 7)}
+                if i == 2
+                else (
+                    {j: [] for j in range(7, 9)}
+                    if i == 3
+                    else {j: [] for j in range(9, 11)}
+                )
+            )
+        )
+        for i in range(1, 5)
+    }
+
+
 def csv_saving(data: list, csv_file_name: str) -> pd.DataFrame:
     """coin symbol csv saving
 

@@ -18,10 +18,6 @@ from selenium.common.exceptions import (
 from fake_useragent import UserAgent
 
 
-from parsing.google_bing_parsing_drive import (
-    GoogleNewsCrawlingParsingDrive,
-    BingNewsCrawlingParsingDrive,
-)
 from parsing.util._xpath_location import (
     WAIT_TIME,
     SCROLL_ITERATIONS,
@@ -83,7 +79,7 @@ def chrome_option_injection():
     return webdriver_remote
 
 
-class GoogleMovingElementsLocation(GoogleNewsCrawlingParsingDrive):
+class GoogleMovingElementsLocation:
     """구글 홈페이지 크롤링
 
     Args:
@@ -100,7 +96,7 @@ class GoogleMovingElementsLocation(GoogleNewsCrawlingParsingDrive):
         self.driver: webdriver.Chrome = chrome_option_injection()
         self.count = count
 
-    def search_box(self) -> None:
+    def search_box(self):
         """수집 시작점
         - self.page_scroll_moving()
             - page 내리기
@@ -130,25 +126,27 @@ class GoogleMovingElementsLocation(GoogleNewsCrawlingParsingDrive):
         )
         return news_box_type
 
-    def a_loop_page(self, start: int, xpath_type: Callable[[int], str]) -> None:
+    def a_loop_page(self, start: int, xpath_type: Callable[[int], str]) -> list[str]:
         """페이지 수집하면서 이동
 
         Args:
             start (int): 페이지 이동 시작 html location
             xpath_type (Callable[[int], str]): google은 여러 HTML 이므로 회피 목적으로 xpath 함수를 만듬
         """
+        data = []
         for i in range(start, self.count + start):
             next_page_button: Any = self.search_box_page_type(xpath_type(i))
-            self.news_info_collect(self.driver.page_source)
-            print(f"{i-1}page로 이동합니다 --> {xpath_type(i)} 이용합니다")
+            print(f"{i}page로 이동합니다 --> {xpath_type(i)} 이용합니다")
+            data.append(self.driver.page_source)
             next_page_button.click()
             time.sleep(5)
             self.page_scroll_moving()
         else:
             print("google 수집 종료")
             self.driver.quit()
+        return data
 
-    def next_page_moving(self) -> None:
+    def next_page_moving(self) -> list[dict[int, list[str]]]:
         """페이지 수집 이동 본체"""
 
         def mo_xpath_injection(start: int) -> str:
@@ -162,13 +160,14 @@ class GoogleMovingElementsLocation(GoogleNewsCrawlingParsingDrive):
             return f'//*[@id="botstuff"]/div/div[3]/table/tbody/tr/td[{start}]/a'
 
         # 실행시작 지점
+        self.driver.get(self.url)
         try:
-            self.a_loop_page(3, pa_xpath_injection)
+            return self.a_loop_page(3, pa_xpath_injection)
         except (NoSuchElementException, TimeoutException):
-            self.a_loop_page(2, mo_xpath_injection)
+            return self.a_loop_page(2, mo_xpath_injection)
 
 
-class BingMovingElementLocation(BingNewsCrawlingParsingDrive):
+class BingMovingElementLocation:
     """빙 홈페이지 크롤링
 
     Args:
@@ -186,6 +185,7 @@ class BingMovingElementLocation(BingNewsCrawlingParsingDrive):
         self.driver: webdriver.Remote = chrome_option_injection()
 
     def repeat_scroll(self) -> None:
+        """Bing은 무한 스크롤이기에 횟수만큼 페이지를 내리도록 하였음"""
         self.driver.get(self.url)
         # 스크롤 내리기 전 위치
         scroll_location: int = self.driver.execute_script(
@@ -220,6 +220,8 @@ class BingMovingElementLocation(BingNewsCrawlingParsingDrive):
                         "return document.body.scrollHeight"
                     )
             time.sleep(3)
-            self.driver.quit()
         except InvalidSessionIdException:
             pass
+        finally:
+            print("Bing 수집 종료")
+            self.driver.quit()
