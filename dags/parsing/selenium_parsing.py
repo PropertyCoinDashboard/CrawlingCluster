@@ -4,6 +4,7 @@ import urllib3
 
 from typing import Any, Callable
 from urllib3 import exceptions
+from collections import deque
 
 import undetected_chromedriver as uc
 from selenium import webdriver
@@ -14,10 +15,14 @@ from selenium.common.exceptions import (
     InvalidSessionIdException,
     TimeoutException,
     NoSuchElementException,
+    WebDriverException,
 )
 from fake_useragent import UserAgent
 
-
+from parsing.google_bing_parsing_drive import (
+    GoogleNewsCrawlingParsingDrive,
+    BingNewsCrawlingParsingDrive,
+)
 from parsing.util._xpath_location import (
     WAIT_TIME,
     SCROLL_ITERATIONS,
@@ -32,10 +37,13 @@ ua = UserAgent()
 def chrome_option_injection():
     # 크롬 옵션 설정
     option_chrome = uc.ChromeOptions()
-    # option_chrome.add_argument("headless")
-    # option_chrome.add_argument("disable-gpu")
-    # option_chrome.add_argument("disable-infobars")
-    # option_chrome.add_argument("--disable-extensions")
+    option_chrome.add_argument("headless")
+    option_chrome.add_argument("disable-gpu")
+    option_chrome.add_argument("--disable-infobars")
+    option_chrome.add_argument("--disable-extensions")
+    option_chrome.add_argument("--disable-gpu")
+    option_chrome.add_argument("--no-sandbox")
+    option_chrome.add_argument("--disable-dev-shm-usage")
     option_chrome.add_argument(f"user-agent={ua.random}")
     prefs: dict[str, dict[str, int]] = {
         "profile.default_content_setting_values": {
@@ -79,7 +87,7 @@ def chrome_option_injection():
     return webdriver_remote
 
 
-class GoogleMovingElementsLocation:
+class GoogleMovingElementsLocation(GoogleNewsCrawlingParsingDrive):
     """구글 홈페이지 크롤링
 
     Args:
@@ -95,17 +103,6 @@ class GoogleMovingElementsLocation:
         self.url = f"https://www.google.com/search?q={target}&tbm=nws&gl=ko&hl=kr"
         self.driver: webdriver.Chrome = chrome_option_injection()
         self.count = count
-
-    def search_box(self):
-        """수집 시작점
-        - self.page_scroll_moving()
-            - page 내리기
-        - self.next_page_moving()
-            - 다음 page 이동
-        """
-        self.driver.get(self.url)
-        self.page_scroll_moving()
-        self.next_page_moving()
 
     def page_scroll_moving(self) -> None:
         """
@@ -126,27 +123,36 @@ class GoogleMovingElementsLocation:
         )
         return news_box_type
 
-    def a_loop_page(self, start: int, xpath_type: Callable[[int], str]) -> list[str]:
+    def a_loop_page(
+        self, start: int, xpath_type: Callable[[int], str]
+    ) -> deque[list[str]]:
         """페이지 수집하면서 이동
 
         Args:
             start (int): 페이지 이동 시작 html location
             xpath_type (Callable[[int], str]): google은 여러 HTML 이므로 회피 목적으로 xpath 함수를 만듬
         """
-        data = []
+        data = deque()
         for i in range(start, self.count + start):
-            next_page_button: Any = self.search_box_page_type(xpath_type(i))
-            print(f"{i}page로 이동합니다 --> {xpath_type(i)} 이용합니다")
-            data.append(self.driver.page_source)
-            next_page_button.click()
-            time.sleep(5)
-            self.page_scroll_moving()
+            try:
+                next_page_button: Any = self.search_box_page_type(xpath_type(i))
+                print(f"{i}page로 이동합니다 --> {xpath_type(i)} 이용합니다")
+                url_data: list[str] = self.news_info_collect(self.driver.page_source)
+                data.append(url_data)
+                next_page_button.click()
+                time.sleep(5)
+                self.page_scroll_moving()
+            except WebDriverException as e:
+                print(e)
+                print(f"다음과 같은 이유로 google 수집 종료 --> {e}")
+                self.driver.quit()
+                return data
         else:
             print("google 수집 종료")
             self.driver.quit()
         return data
 
-    def next_page_moving(self) -> list[dict[int, list[str]]]:
+    def next_page_moving(self) -> deque[list[str]]:
         """페이지 수집 이동 본체"""
 
         def mo_xpath_injection(start: int) -> str:
@@ -166,8 +172,19 @@ class GoogleMovingElementsLocation:
         except (NoSuchElementException, TimeoutException):
             return self.a_loop_page(2, mo_xpath_injection)
 
+    def search_box(self) -> deque[list[str]]:
+        """수집 시작점
+        - self.page_scroll_moving()
+            - page 내리기
+        - self.next_page_moving()
+            - 다음 page 이동
+        """
+        self.driver.get(self.url)
+        self.page_scroll_moving()
+        return self.next_page_moving()
 
-class BingMovingElementLocation:
+
+class BingMovingElementLocation(BingNewsCrawlingParsingDrive):
     """빙 홈페이지 크롤링
 
     Args:
@@ -193,6 +210,7 @@ class BingMovingElementLocation:
         )
         try:
             i = 0
+            data = deque()
             while i < self.count:
                 # 현재 스크롤의 가장 아래로 내림
                 self.driver.execute_script(
@@ -208,7 +226,9 @@ class BingMovingElementLocation:
                 )
                 i += 1
                 # page url
-                self.news_info_collect(self.driver.page_source)
+                url_element: list[str] = self.news_info_collect(self.driver.page_source)
+                data.append(url_element)
+
                 # 늘어난 스크롤 위치와 이동 전 위치 같으면(더 이상 스크롤이 늘어나지 않으면) 종료
                 if scroll_location == scroll_height:
                     break
@@ -220,6 +240,7 @@ class BingMovingElementLocation:
                         "return document.body.scrollHeight"
                     )
             time.sleep(3)
+            return data
         except InvalidSessionIdException:
             pass
         finally:
