@@ -134,19 +134,13 @@ class GoogleMovingElementsLocation(GoogleNewsCrawlingParsingDrive):
         """
         data = deque()
         for i in range(start, self.count + start):
-            try:
-                next_page_button: Any = self.search_box_page_type(xpath_type(i))
-                print(f"{i}page로 이동합니다 --> {xpath_type(i)} 이용합니다")
-                url_data: list[str] = self.news_info_collect(self.driver.page_source)
-                data.append(url_data)
-                next_page_button.click()
-                time.sleep(5)
-                self.page_scroll_moving()
-            except WebDriverException as e:
-                print(e)
-                print(f"다음과 같은 이유로 google 수집 종료 --> {e}")
-                self.driver.quit()
-                return data
+            next_page_button: Any = self.search_box_page_type(xpath_type(i))
+            print(f"{i-1}page로 이동합니다 --> {xpath_type(i)} 이용합니다")
+            url_data: list[str] = self.news_info_collect(self.driver.page_source)
+            data.append(url_data)
+            next_page_button.click()
+            time.sleep(5)
+            self.page_scroll_moving()
         else:
             print("google 수집 종료")
             self.driver.quit()
@@ -169,8 +163,10 @@ class GoogleMovingElementsLocation(GoogleNewsCrawlingParsingDrive):
         self.driver.get(self.url)
         try:
             return self.a_loop_page(3, pa_xpath_injection)
-        except (NoSuchElementException, TimeoutException):
+        except NoSuchElementException:
             return self.a_loop_page(2, mo_xpath_injection)
+        except WebDriverException as e:
+            print(f"다음과 같은 이유로 google 수집 종료 --> {e}")
 
     def search_box(self) -> deque[list[str]]:
         """수집 시작점
@@ -201,7 +197,7 @@ class BingMovingElementLocation(BingNewsCrawlingParsingDrive):
         self.count = count
         self.driver: webdriver.Remote = chrome_option_injection()
 
-    def repeat_scroll(self) -> None:
+    def repeat_scroll(self) -> deque[list[str]]:
         """Bing은 무한 스크롤이기에 횟수만큼 페이지를 내리도록 하였음"""
         self.driver.get(self.url)
         # 스크롤 내리기 전 위치
