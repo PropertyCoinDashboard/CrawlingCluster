@@ -4,11 +4,10 @@ Airflow 발전시키기
 """
 
 import aiohttp
-from aiohttp.client_exceptions import ClientConnectionError
 
 import asyncio
 import tracemalloc
-from typing import Callable, Any, Coroutine
+from typing import Callable, Coroutine
 from collections import deque
 from parsing.util.util_parser import data_structure
 from concurrent.futures import ThreadPoolExecutor, as_completed

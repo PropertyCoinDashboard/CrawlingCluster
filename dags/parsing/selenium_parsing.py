@@ -133,17 +133,21 @@ class GoogleMovingElementsLocation(GoogleNewsCrawlingParsingDrive):
             xpath_type (Callable[[int], str]): google은 여러 HTML 이므로 회피 목적으로 xpath 함수를 만듬
         """
         data = deque()
-        for i in range(start, self.count + start):
-            next_page_button: Any = self.search_box_page_type(xpath_type(i))
-            print(f"{i-1}page로 이동합니다 --> {xpath_type(i)} 이용합니다")
-            url_data: list[str] = self.news_info_collect(self.driver.page_source)
-            data.append(url_data)
-            next_page_button.click()
-            time.sleep(5)
-            self.page_scroll_moving()
-        else:
-            print("google 수집 종료")
-            self.driver.quit()
+        try:
+            for i in range(start, self.count + start):
+                next_page_button: Any = self.search_box_page_type(xpath_type(i))
+                print(f"{i-1}page로 이동합니다 --> {xpath_type(i)} 이용합니다")
+                url_data: list[str] = self.news_info_collect(self.driver.page_source)
+                data.append(url_data)
+                next_page_button.click()
+                time.sleep(5)
+                self.page_scroll_moving()
+            else:
+                print("google 수집 종료")
+                self.driver.quit()
+        except (NoSuchElementException, WebDriverException) as e:
+            print(f"해당 이유로 인해 수집을 다시 시도합니다 --> {e}")
+            self.next_page_moving()
         return data
 
     def next_page_moving(self) -> deque[list[str]]:
@@ -167,6 +171,8 @@ class GoogleMovingElementsLocation(GoogleNewsCrawlingParsingDrive):
             return self.a_loop_page(2, mo_xpath_injection)
         except WebDriverException as e:
             print(f"다음과 같은 이유로 google 수집 종료 --> {e}")
+            print("webserver 다시 시작합니다")
+            self.next_page_moving()
 
     def search_box(self) -> deque[list[str]]:
         """수집 시작점
