@@ -148,7 +148,7 @@ class GoogleMovingElementsLocation(GoogleNewsCrawlingParsingDrive):
                 self.driver.quit()
         except (NoSuchElementException, WebDriverException) as e:
             print(f"해당 이유로 인해 수집을 다시 시도합니다 --> {e}")
-            self.next_page_moving()
+            self.driver.refresh()
         return data
 
     def next_page_moving(self) -> deque[list[str]]:
@@ -173,7 +173,7 @@ class GoogleMovingElementsLocation(GoogleNewsCrawlingParsingDrive):
         except WebDriverException as e:
             print(f"다음과 같은 이유로 google 수집 종료 --> {e}")
             print("webserver 다시 시작합니다")
-            self.next_page_moving()
+            self.driver.refresh()
 
     def search_box(self) -> deque[list[str]]:
         """수집 시작점

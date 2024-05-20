@@ -123,7 +123,7 @@ def indstrict(page: SeleniumUrlCollect, target: str, counting: int) -> UrlDataSt
         counting (int): 몇번 스크래핑 진행할건지
 
     Returns:
-        UrlDataStructure[int, int , str]:
+        UrlDataStructure:
         - \n {
             1: {1: [url 대상들], 2: [url 대상들],3: [url 대상들], 4: [url 대상들]},
             2: {5: [url 대상들], 6:[url 대상들]},
