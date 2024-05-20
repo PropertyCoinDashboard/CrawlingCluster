@@ -2,14 +2,21 @@
 파일 유틸리티
 """
 
-from typing import Any, Union
+from collections import deque
+from typing import Any
 from pathlib import Path
 from urllib.parse import urlparse
 
-import requests
-import pandas as pd
 
+import pandas as pd
 from bs4 import BeautifulSoup
+from parsing.util._typing import (
+    UrlDataStructure,
+    DataStructure,
+    SeleniumUrlCollect,
+    UrlCollect,
+    OuterData,
+)
 
 # from airflow.providers.mysql.hooks.mysql import MySqlHook
 
@@ -25,7 +32,17 @@ path_location = Path(__file__).parent.parent.parent
 # 데이터 정의
 
 
-def data_structure() -> dict[int, dict[int, list[str]]]:
+def data_structure() -> DataStructure:
+    """데이터 묶기 위한 트리 구조 추상화
+
+    Returns:
+        DataStructure: {
+            1: {1: [], 2: [],3: [], 4: []},
+            2: {5: [], 6:[]},
+            3: {7: [], 8:[]},
+            4: {9: [], 10: []},
+        }
+    """
     return {
         i: (
             {j: [] for j in range(1, 5)}
@@ -84,7 +101,7 @@ def url_addition(url: str) -> str:
 def soup_data(
     html_data: str,
     element: str,
-    elements: dict[str, Union[str, list[str]]],
+    elements: Any,
     soup: BeautifulSoup = None,
 ) -> list:
     """
@@ -97,16 +114,98 @@ def soup_data(
     return search_results if search_results else []
 
 
-def url_parsing(url: str, headers: dict[str, Any]):
+def indstrict(page: SeleniumUrlCollect, target: str, counting: int) -> UrlDataStructure:
     """
-    url parsing
-    """
-    response = requests.get(url, headers=headers, timeout=60)
 
-    match response.status_code:
-        case 200:
-            return response.json()
-        case _:
-            raise requests.exceptions.RequestException(
-                f"API Request에 실패하였습니다 status code --> {response.status_code}"
-            )
+    Args:
+        page (SeleniumUrlCollect): 각 웹페이지에서 selenium을 이용해서 URL 긁어옴
+        target (str): 긁어올 대상
+        counting (int): 몇번 스크래핑 진행할건지
+
+    Returns:
+        UrlDataStructure[int, int , str]:
+        - \n {
+            1: {1: [url 대상들], 2: [url 대상들],3: [url 대상들], 4: [url 대상들]},
+            2: {5: [url 대상들], 6:[url 대상들]},
+            3: {7: [url 대상들], 8:[url 대상들]},
+            4: {9: [url 대상들], 10: [url 대상들]},
+        }
+
+    """
+    data: DataStructure = data_structure()
+    count = 1
+
+    # 요소가 들어올때마다 머금고 있어야함
+    url: UrlCollect = page(target, counting)
+    while len(url) > 0:
+        url_data: list[str] = url.popleft()
+        if count >= 9:
+            first = 4
+        elif count >= 7:
+            first = 3
+        elif count >= 5:
+            first = 2
+        else:
+            first = 1
+
+        if url_data not in data[first][count]:
+            data[first][count] = url_data
+
+        count += 1
+
+    return data
+
+
+# DFS 함수 정의
+def recursive_dfs(
+    node: int, graph: UrlDataStructure, discovered: list = []
+) -> list[int]:
+    if discovered is None:
+        discovered = []
+
+    discovered.append(node)
+    for n in graph.get(node, []):
+        if n not in discovered:
+            recursive_dfs(n, graph, discovered)
+
+    return discovered
+
+
+# BFS 함수 정의
+def iterative_bfs(start_v: int, graph: dict[int, list[str]]) -> UrlCollect:
+    start = deque()
+
+    visited = set()
+    queue = deque([start_v])
+    visited.add(start_v)
+    while queue:
+        node: int = queue.popleft()
+        if graph.get(node, []):
+            start.append(graph[node])
+            if node not in visited:
+                visited.add(node)
+                queue.append(node)
+
+    return start
+
+
+def deep_dive_search(
+    page: SeleniumUrlCollect,
+    target: str,
+    counting: int,
+    objection: str,
+) -> UrlCollect:
+    starting_queue = deque()
+    tree: UrlDataStructure = indstrict(page, target, counting)
+    dfs: list[int] = recursive_dfs(1, tree)
+
+    print(f"{objection}의 검색된 노드의 순서 --> {dfs}")
+    for location in dfs:
+        try:
+            element: OuterData = tree[location]
+            for num in element.keys():
+                urls: list[str] = iterative_bfs(num, element).pop()
+                starting_queue.append(urls)
+        except (KeyError, IndexError):
+            continue
+    return starting_queue

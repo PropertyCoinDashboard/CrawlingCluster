@@ -3,6 +3,7 @@ Google Crawling Parsing Drive
 """
 
 import re
+from typing import Any
 from bs4 import BeautifulSoup
 from parsing.util.util_parser import soup_data
 
@@ -81,7 +82,7 @@ class GoogleNewsCrawlingParsingDrive:
             for div_2 in self.div_in_class(div_1):
                 for a_tag in self.div_a_tags(div_2):
                     url = href_from_a_tag(a_tag, "href")
-                    title = href_from_text_preprocessing(a_tag.text)[:20]
+                    # title = href_from_text_preprocessing(a_tag.text)[:20]
                     element.append(url)
                 return element
 
@@ -104,8 +105,8 @@ class BingNewsCrawlingParsingDrive:
 
     # fmt: off
     def detection_element(
-        self, html_source: str, *element: tuple[str]
-    ) -> tuple[str, str]:
+        self, html_source: str, *element: str
+    ) -> tuple[str]:
         """Bing HTML element 요소 추출하기
         
         Args: 
@@ -130,7 +131,7 @@ class BingNewsCrawlingParsingDrive:
         """
         pattern = r'class="([^"]+)"'
         class_values: set[str] = set(element for element in re.findall(pattern, html_source))
-        data: tuple[str] = tuple(elem for elem in element if elem in class_values)
+        data: tuple[str, ...] = tuple(elem for elem in element if elem in class_values)
         return data
 
     def news_info_collect(self, html_source: str) -> list[str]:
@@ -142,7 +143,7 @@ class BingNewsCrawlingParsingDrive:
         """
         # 첫번쨰 요소 접근  -> <div class="algocore"> or nwscnt
         # 요소 필터링 하여 확인 되는 요소만 크롤링할 수 있게 행동 제약 
-        detect: tuple[str, str] = self.detection_element(
+        detect: tuple[str] = self.detection_element(
             html_source,
             "nwscnt",
             "newscard vr",
@@ -161,7 +162,7 @@ class BingNewsCrawlingParsingDrive:
         for div_1 in div_class_algocore:
             for div_2 in self.div_in_class(div_1, detect[1]):
                 url = href_from_a_tag(div_2, "url")
-                title = href_from_text_preprocessing(div_2["data-title"][:20])
+                # title = href_from_text_preprocessing(div_2["data-title"][:20])
                 data.append(url)
             
         return data

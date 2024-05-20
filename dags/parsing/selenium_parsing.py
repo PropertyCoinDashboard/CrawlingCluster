@@ -23,6 +23,7 @@ from parsing.google_bing_parsing_drive import (
     GoogleNewsCrawlingParsingDrive,
     BingNewsCrawlingParsingDrive,
 )
+from parsing.util._typing import UrlCollect
 from parsing.util._xpath_location import (
     WAIT_TIME,
     SCROLL_ITERATIONS,
@@ -113,7 +114,7 @@ class GoogleMovingElementsLocation(GoogleNewsCrawlingParsingDrive):
         )
         for i in range(1, SCROLL_ITERATIONS):
             time.sleep(5)
-            scroll_cal: int = prev_height / SCROLL_ITERATIONS * i
+            scroll_cal: float = prev_height / SCROLL_ITERATIONS * i
             self.driver.execute_script(f"window.scrollTo(0, {scroll_cal})")
 
     def search_box_page_type(self, xpath: str) -> Any:
@@ -203,7 +204,7 @@ class BingMovingElementLocation(BingNewsCrawlingParsingDrive):
         self.count = count
         self.driver: webdriver.Remote = chrome_option_injection()
 
-    def repeat_scroll(self) -> deque[list[str]]:
+    def repeat_scroll(self) -> UrlCollect:
         """Bing은 무한 스크롤이기에 횟수만큼 페이지를 내리도록 하였음"""
         self.driver.get(self.url)
         # 스크롤 내리기 전 위치
@@ -212,7 +213,7 @@ class BingMovingElementLocation(BingNewsCrawlingParsingDrive):
         )
         try:
             i = 0
-            data = deque()
+            data: UrlCollect = deque()
             while i < self.count:
                 # 현재 스크롤의 가장 아래로 내림
                 self.driver.execute_script(
