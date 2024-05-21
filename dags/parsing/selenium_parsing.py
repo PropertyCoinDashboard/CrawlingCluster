@@ -1,4 +1,4 @@
-import time
+import random
 import urllib3
 
 
@@ -17,9 +17,11 @@ from selenium.common.exceptions import (
     NoSuchElementException,
     WebDriverException,
 )
+from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
+
 from fake_useragent import UserAgent
 
-from parsing.google_bing_parsing_drive import (
+from dags.parsing.gb_parsing_drive import (
     GoogleNewsCrawlingParsingDrive,
     BingNewsCrawlingParsingDrive,
 )
@@ -35,18 +37,22 @@ urllib3.disable_warnings(exceptions.InsecureRequestWarning)
 ua = UserAgent()
 
 
-def chrome_option_injection():
+def chrome_option_injection() -> webdriver.Chrome:
     # 크롬 옵션 설정
     option_chrome = uc.ChromeOptions()
     option_chrome.add_argument("headless")
-    option_chrome.add_argument("disable-gpu")
+    option_chrome.add_argument("--disable-gpu")
     option_chrome.add_argument("--disable-infobars")
     option_chrome.add_argument("--disable-extensions")
-    option_chrome.add_argument("--disable-gpu")
     option_chrome.add_argument("--no-sandbox")
     option_chrome.add_argument("--disable-dev-shm-usage")
     option_chrome.add_argument(f"user-agent={ua.random}")
-    prefs: dict[str, dict[str, int]] = {
+
+    caps = DesiredCapabilities().CHROME
+    # page loading 없애기
+    caps["pageLoadStrategy"] = "none"
+
+    prefs = {
         "profile.default_content_setting_values": {
             "cookies": 2,
             "images": 2,
@@ -113,7 +119,7 @@ class GoogleMovingElementsLocation(GoogleNewsCrawlingParsingDrive):
             "return document.body.scrollHeight"
         )
         for i in range(1, SCROLL_ITERATIONS):
-            time.sleep(5)
+            self.driver.implicitly_wait(random.uniform(2.0, 5.0))
             scroll_cal: float = prev_height / SCROLL_ITERATIONS * i
             self.driver.execute_script(f"window.scrollTo(0, {scroll_cal})")
 
@@ -124,9 +130,7 @@ class GoogleMovingElementsLocation(GoogleNewsCrawlingParsingDrive):
         )
         return news_box_type
 
-    def a_loop_page(
-        self, start: int, xpath_type: Callable[[int], str]
-    ) -> deque[list[str]]:
+    def a_loop_page(self, start: int, xpath_type: Callable[[int], str]) -> UrlCollect:
         """페이지 수집하면서 이동
 
         Args:
@@ -141,7 +145,7 @@ class GoogleMovingElementsLocation(GoogleNewsCrawlingParsingDrive):
                 url_data: list[str] = self.news_info_collect(self.driver.page_source)
                 data.append(url_data)
                 next_page_button.click()
-                time.sleep(5)
+                self.driver.implicitly_wait(random.uniform(2.0, 5.0))
                 self.page_scroll_moving()
             else:
                 print("google 수집 종료")
@@ -151,7 +155,7 @@ class GoogleMovingElementsLocation(GoogleNewsCrawlingParsingDrive):
             self.driver.refresh()
         return data
 
-    def next_page_moving(self) -> deque[list[str]]:
+    def next_page_moving(self) -> UrlCollect:
         """페이지 수집 이동 본체"""
 
         def mo_xpath_injection(start: int) -> str:
@@ -175,7 +179,7 @@ class GoogleMovingElementsLocation(GoogleNewsCrawlingParsingDrive):
             print("webserver 다시 시작합니다")
             self.driver.refresh()
 
-    def search_box(self) -> deque[list[str]]:
+    def search_box(self) -> UrlCollect:
         """수집 시작점
         - self.page_scroll_moving()
             - page 내리기
@@ -221,7 +225,7 @@ class BingMovingElementLocation(BingNewsCrawlingParsingDrive):
                 )
 
                 # 전체 스크롤이 늘어날 때까지 대기
-                time.sleep(5)
+                self.driver.implicitly_wait(random.uniform(2.0, 5.0))
 
                 # 늘어난 스크롤 높이
                 scroll_height: int = self.driver.execute_script(
@@ -242,7 +246,6 @@ class BingMovingElementLocation(BingNewsCrawlingParsingDrive):
                     scroll_location = self.driver.execute_script(
                         "return document.body.scrollHeight"
                     )
-            time.sleep(3)
             return data
         except InvalidSessionIdException:
             pass
