@@ -2,6 +2,8 @@
 파일 유틸리티
 """
 
+import aiohttp
+import re
 from collections import deque
 from typing import Any
 from pathlib import Path
@@ -101,7 +103,7 @@ def url_addition(url: str) -> str:
 def soup_data(
     html_data: str,
     element: str,
-    elements: Any,
+    elements: Any | None,
     soup: BeautifulSoup = None,
 ) -> list:
     """
@@ -112,6 +114,29 @@ def soup_data(
 
     search_results = soup.find_all(element, elements)
     return search_results if search_results else []
+
+
+def href_from_text_preprocessing(text: str) -> str:
+    """텍스트 전처리
+
+    Args:
+        text (str): URL title 및 시간
+            - ex) 어쩌구 저쩌구...12시간
+
+    Returns:
+        str: 특수문자 및 시간제거
+            - ex) 어쩌구 저쩌구
+    """
+    return re.sub(r"\b\d+시간 전\b|\.{2,}|[^\w\s]", "", text)
+
+
+def href_from_a_tag(a_tag: BeautifulSoup, element: str = "href") -> str:
+    """URL 뽑아내기
+
+    Returns:
+        str: [URL, ~~]
+    """
+    return a_tag.get(element)
 
 
 def indstrict(page: SeleniumUrlCollect, target: str, counting: int) -> UrlDataStructure:
@@ -209,3 +234,40 @@ def deep_dive_search(
         except (KeyError, IndexError):
             continue
     return starting_queue
+
+
+class AsyncRequestAcquisitionHTML:
+    def __init__(
+        self,
+        session: aiohttp.ClientSession,
+        url: str,
+        params: dict[str, str] | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> None:
+        self.url = url
+        self.params = params
+        self.headers = headers
+        self.session = session
+
+    @staticmethod
+    async def asnyc_request(url: str):
+        async with aiohttp.ClientSession() as session:
+            return await AsyncRequestAcquisitionHTML(
+                session, url
+            ).asnyc_status_classifer()
+
+    async def async_html_source(self) -> str:
+        async with self.session.get(
+            url=self.url, params=self.params, headers=self.headers
+        ) as response:
+            return await response.text()
+
+    async def asnyc_status_classifer(self) -> tuple[str, int]:
+        async with self.session.get(
+            url=self.url, params=self.params, headers=self.headers
+        ) as response:
+            match response.status:
+                case 200:
+                    return self.url, response.status
+                case _:
+                    return self.url, response.status

@@ -1,3 +1,4 @@
+import time
 import random
 import urllib3
 
@@ -21,7 +22,7 @@ from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 
 from fake_useragent import UserAgent
 
-from dags.parsing.gb_parsing_drive import (
+from parsing.gb_parsing_drive import (
     GoogleNewsCrawlingParsingDrive,
     BingNewsCrawlingParsingDrive,
 )
@@ -225,7 +226,7 @@ class BingMovingElementLocation(BingNewsCrawlingParsingDrive):
                 )
 
                 # 전체 스크롤이 늘어날 때까지 대기
-                self.driver.implicitly_wait(random.uniform(2.0, 5.0))
+                time.sleep(5)
 
                 # 늘어난 스크롤 높이
                 scroll_height: int = self.driver.execute_script(
@@ -246,6 +247,7 @@ class BingMovingElementLocation(BingNewsCrawlingParsingDrive):
                     scroll_location = self.driver.execute_script(
                         "return document.body.scrollHeight"
                     )
+            time.sleep(5)
             return data
         except InvalidSessionIdException:
             pass

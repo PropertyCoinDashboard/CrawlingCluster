@@ -5,30 +5,7 @@ Google Crawling Parsing Drive
 import re
 from typing import Any
 from bs4 import BeautifulSoup
-from parsing.util.util_parser import soup_data
-
-
-def href_from_text_preprocessing(text: str) -> str:
-    """텍스트 전처리
-
-    Args:
-        text (str): URL title 및 시간
-            - ex) 어쩌구 저쩌구...12시간
-
-    Returns:
-        str: 특수문자 및 시간제거
-            - ex) 어쩌구 저쩌구
-    """
-    return re.sub(r"\b\d+시간 전\b|\.{2,}|[^\w\s]", "", text)
-
-
-def href_from_a_tag(a_tag: BeautifulSoup, element: str) -> str:
-    """URL 뽑아내기
-
-    Returns:
-        str: [URL, ~~]
-    """
-    return a_tag.get(element)
+from parsing.util.util_parser import soup_data, href_from_a_tag
 
 
 class GoogleNewsCrawlingParsingDrive:
