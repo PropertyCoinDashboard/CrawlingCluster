@@ -43,17 +43,6 @@ class DaumNewsParsingDriver:
         }
 
     async def get_daum_news_urls(self) -> list[str]:
-        """
-        Daum 검색 엔진을 사용하여 뉴스 URL 목록을 가져옵니다.
-
-        Args:
-             search_query (str): 검색어
-             total_pages (int, optional): 검색할 총 페이지 수. 기본값은 11.
-
-        Returns:
-             List[str]: 뉴스 URL 목록
-        """
-
         all_urls = []
         async with aiohttp.ClientSession() as session:
             for page in range(1, self.total_pages + 1):
@@ -68,15 +57,6 @@ class DaumNewsParsingDriver:
             return all_urls
 
     async def extract_news_urls(self) -> list[str]:
-        """
-        HTML에서 뉴스 URL을 추출합니다.
-
-        Args:
-             html (str): HTML 문자열
-
-        Returns:
-             List[str]: 뉴스 URL 목록
-        """
         htmls: list[str] = await self.get_daum_news_urls()
         html_data: list[list[str]] = [
             soup_data(
