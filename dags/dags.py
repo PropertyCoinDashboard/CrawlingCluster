@@ -43,6 +43,14 @@ def process_google(target: str, count: int) -> UrlCollect:
     return GoogleMovingElementsLocation(target, count).search_box()
 
 
+async def process_daum():
+    news_search = DaumNewsParsingDriver(D_HEADERS, query, max_results)
+
+    # 비동기로 네이버와 카카오 뉴스 URL 가져오기
+    daum_news_urls_task = await news_search.extract_news_urls()
+    return daum_news_urls_task
+
+
 async def url_classifier(url: str, status: int) -> None:
     match status:
         case 200:
@@ -74,15 +82,6 @@ async def aiorequest_injection(start: UrlCollect, batch_size: int) -> None:
                         print(f"Type 불일치: {url_collect}")
 
 
-async def daum():
-    news_search = DaumNewsParsingDriver(D_HEADERS, query, max_results)
-
-    # 비동기로 네이버와 카카오 뉴스 URL 가져오기
-    daum_news_urls_task = await news_search.extract_news_urls()
-    print(daum_news_urls_task)
-
-
-asyncio.run(daum())
 # with ThreadPoolExecutor(2) as poll:
 #     task = [
 #         poll.submit(deep_dive_search, process_google, "BTC", 10, "google"),
