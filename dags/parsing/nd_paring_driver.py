@@ -47,7 +47,7 @@ class DaumNewsParsingDriver:
     async def extract_news_urls(self) -> list[list[str]]:
         htmls: list[str] = await self.get_daum_news_urls()
         html_data: list[list[str]] = [
-            await soup_data(
+            soup_data(
                 html_data=html,
                 element="a",
                 elements={"class": "tit_main fn_tit_u"},

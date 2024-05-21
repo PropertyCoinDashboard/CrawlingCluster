@@ -100,7 +100,7 @@ def url_addition(url: str) -> str:
     return link
 
 
-async def soup_data(
+def soup_data(
     html_data: str,
     element: str,
     elements: Any | None,

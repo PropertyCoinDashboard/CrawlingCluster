@@ -120,7 +120,7 @@ class GoogleMovingElementsLocation(GoogleNewsCrawlingParsingDrive):
             "return document.body.scrollHeight"
         )
         for i in range(1, SCROLL_ITERATIONS):
-            self.driver.implicitly_wait(random.uniform(2.0, 5.0))
+            time.sleep(random.uniform(2.0, 5.0))
             scroll_cal: float = prev_height / SCROLL_ITERATIONS * i
             self.driver.execute_script(f"window.scrollTo(0, {scroll_cal})")
 
@@ -146,7 +146,7 @@ class GoogleMovingElementsLocation(GoogleNewsCrawlingParsingDrive):
                 url_data: list[str] = self.news_info_collect(self.driver.page_source)
                 data.append(url_data)
                 next_page_button.click()
-                self.driver.implicitly_wait(random.uniform(2.0, 5.0))
+                time.sleep(random.uniform(2.0, 5.0))
                 self.page_scroll_moving()
             else:
                 print("google 수집 종료")
