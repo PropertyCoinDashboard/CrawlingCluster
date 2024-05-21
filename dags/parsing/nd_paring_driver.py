@@ -1,6 +1,8 @@
 import asyncio
 from bs4 import BeautifulSoup
 
+from collections import deque
+from parsing.util._typing import UrlCollect
 from parsing.config.properties import naver_id, naver_secret, naver_url
 from parsing.util.util_parser import (
     AsyncRequestAcquisitionHTML as ARAH,
@@ -44,7 +46,7 @@ class DaumNewsParsingDriver:
         all_urls = await asyncio.gather(*tasks)
         return all_urls
 
-    async def extract_news_urls(self) -> list[list[str]]:
+    async def extract_news_urls(self) -> UrlCollect:
         htmls: list[str] = await self.get_daum_news_urls()
         html_data: list[list[str]] = [
             soup_data(
@@ -55,7 +57,7 @@ class DaumNewsParsingDriver:
             )
             for html in htmls
         ]
-        url = [list(map(href_from_a_tag, a_tag_list)) for a_tag_list in html_data]
+        url = deque(list(map(href_from_a_tag, a_tag_list)) for a_tag_list in html_data)
         return url
 
 

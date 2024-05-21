@@ -30,11 +30,6 @@ scheduler_queue = deque()
 not_request_queue = deque()
 
 
-# 검색어와 최대 결과 수 설정
-query = "비트코인"
-max_results = 2
-
-
 def process_bing(target: str, count: int) -> UrlCollect:
     return BingMovingElementLocation(target, count).repeat_scroll()
 
@@ -43,8 +38,8 @@ def process_google(target: str, count: int) -> UrlCollect:
     return GoogleMovingElementsLocation(target, count).search_box()
 
 
-async def process_daum():
-    news_search = DaumNewsParsingDriver(D_HEADERS, query, max_results)
+async def process_daum(target: str, count: int) -> UrlCollect:
+    news_search = DaumNewsParsingDriver(D_HEADERS, target, count)
 
     # 비동기로 네이버와 카카오 뉴스 URL 가져오기
     daum_news_urls_task = await news_search.extract_news_urls()
@@ -82,11 +77,16 @@ async def aiorequest_injection(start: UrlCollect, batch_size: int) -> None:
                         print(f"Type 불일치: {url_collect}")
 
 
-# with ThreadPoolExecutor(2) as poll:
-#     task = [
-#         poll.submit(deep_dive_search, process_google, "BTC", 10, "google"),
-#         poll.submit(deep_dive_search, process_bing, "BTC", 10, "bing"),
-#     ]
+with ThreadPoolExecutor(3) as poll:
+    task = [
+        poll.submit(deep_dive_search, process, "BTC", 2, objection)
+        for process, objection in zip(
+            (process_google, process_bing, process_daum), ("google", "bing", "daum")
+        )
+    ]
 
-#     for data in as_completed(task):
-#         asyncio.run(aiorequest_injection(data.result(), 20))
+    for data in as_completed(task):
+        asyncio.run(aiorequest_injection(data.result(), 20))
+
+
+print(len(ready_queue))

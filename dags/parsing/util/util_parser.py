@@ -2,8 +2,10 @@
 파일 유틸리티
 """
 
-import aiohttp
 import re
+import aiohttp
+import asyncio
+import inspect
 from collections import deque
 from typing import Any
 from pathlib import Path
@@ -162,6 +164,9 @@ def indstrict(page: SeleniumUrlCollect, target: str, counting: int) -> UrlDataSt
 
     # 요소가 들어올때마다 머금고 있어야함
     url: UrlCollect = page(target, counting)
+    if inspect.iscoroutine(url):
+        url = asyncio.run(url)
+
     while len(url) > 0:
         url_data: list[str] = url.popleft()
         if count >= 9:

@@ -41,12 +41,12 @@ ua = UserAgent()
 def chrome_option_injection() -> webdriver.Chrome:
     # 크롬 옵션 설정
     option_chrome = uc.ChromeOptions()
-    option_chrome.add_argument("headless")
-    option_chrome.add_argument("--disable-gpu")
-    option_chrome.add_argument("--disable-infobars")
-    option_chrome.add_argument("--disable-extensions")
-    option_chrome.add_argument("--no-sandbox")
-    option_chrome.add_argument("--disable-dev-shm-usage")
+    # option_chrome.add_argument("headless")
+    # option_chrome.add_argument("--disable-gpu")
+    # option_chrome.add_argument("--disable-infobars")
+    # option_chrome.add_argument("--disable-extensions")
+    # option_chrome.add_argument("--no-sandbox")
+    # option_chrome.add_argument("--disable-dev-shm-usage")
     option_chrome.add_argument(f"user-agent={ua.random}")
 
     caps = DesiredCapabilities().CHROME
@@ -120,7 +120,7 @@ class GoogleMovingElementsLocation(GoogleNewsCrawlingParsingDrive):
             "return document.body.scrollHeight"
         )
         for i in range(1, SCROLL_ITERATIONS):
-            time.sleep(random.uniform(2.0, 5.0))
+            time.sleep(5)
             scroll_cal: float = prev_height / SCROLL_ITERATIONS * i
             self.driver.execute_script(f"window.scrollTo(0, {scroll_cal})")
 
@@ -146,7 +146,7 @@ class GoogleMovingElementsLocation(GoogleNewsCrawlingParsingDrive):
                 url_data: list[str] = self.news_info_collect(self.driver.page_source)
                 data.append(url_data)
                 next_page_button.click()
-                time.sleep(random.uniform(2.0, 5.0))
+                time.sleep(5)
                 self.page_scroll_moving()
             else:
                 print("google 수집 종료")
