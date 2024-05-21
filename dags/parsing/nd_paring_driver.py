@@ -1,4 +1,4 @@
-import aiohttp
+import asyncio
 from bs4 import BeautifulSoup
 
 from parsing.config.properties import naver_id, naver_secret, naver_url
@@ -24,24 +24,30 @@ class DaumNewsParsingDriver:
             "sort": "accuracy",
         }
 
-    async def get_daum_news_urls(self) -> list[str]:
-        all_urls = []
-        async with aiohttp.ClientSession() as session:
-            for page in range(1, self.total_pages + 1):
-                self.params["p"] = page
-                urls = await ARAH(
-                    session=session,
-                    url=self.url,
-                    params=self.params,
-                    headers=self.d_header,
-                ).async_html_source()
-                all_urls.append(urls)
-            return all_urls
+    async def fetch_page_urls(
+        self, url: str, params: dict[str, str], headers: dict[str, str], page: int
+    ) -> str:
+        self.params["p"] = page
+        urls = await ARAH.async_html(
+            url=url,
+            params=params,
+            headers=headers,
+        )
+        return urls
 
-    async def extract_news_urls(self) -> list[str]:
+    async def get_daum_news_urls(self) -> list[str]:
+        tasks: list[str] = [
+            self.fetch_page_urls(self.url, self.params, self.d_header, page)
+            for page in range(1, self.total_pages + 1)
+        ]
+
+        all_urls = await asyncio.gather(*tasks)
+        return all_urls
+
+    async def extract_news_urls(self) -> list[list[str]]:
         htmls: list[str] = await self.get_daum_news_urls()
         html_data: list[list[str]] = [
-            soup_data(
+            await soup_data(
                 html_data=html,
                 element="a",
                 elements={"class": "tit_main fn_tit_u"},

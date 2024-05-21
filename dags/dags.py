@@ -82,11 +82,12 @@ async def daum():
     print(daum_news_urls_task)
 
 
-with ThreadPoolExecutor(2) as poll:
-    task = [
-        poll.submit(deep_dive_search, process_google, "BTC", 10, "google"),
-        poll.submit(deep_dive_search, process_bing, "BTC", 10, "bing"),
-    ]
+asyncio.run(daum())
+# with ThreadPoolExecutor(2) as poll:
+#     task = [
+#         poll.submit(deep_dive_search, process_google, "BTC", 10, "google"),
+#         poll.submit(deep_dive_search, process_bing, "BTC", 10, "bing"),
+#     ]
 
-    for data in as_completed(task):
-        asyncio.run(aiorequest_injection(data.result(), 20))
+#     for data in as_completed(task):
+#         asyncio.run(aiorequest_injection(data.result(), 20))

@@ -100,7 +100,7 @@ def url_addition(url: str) -> str:
     return link
 
 
-def soup_data(
+async def soup_data(
     html_data: str,
     element: str,
     elements: Any | None,
@@ -255,6 +255,17 @@ class AsyncRequestAcquisitionHTML:
             return await AsyncRequestAcquisitionHTML(
                 session, url
             ).asnyc_status_classifer()
+
+    @staticmethod
+    async def async_html(
+        url: str,
+        params: dict[str, str] | None = None,
+        headers: dict[str, str] | None = None,
+    ):
+        async with aiohttp.ClientSession() as session:
+            return await AsyncRequestAcquisitionHTML(
+                session, url, params, headers
+            ).async_html_source()
 
     async def async_html_source(self) -> str:
         async with self.session.get(
