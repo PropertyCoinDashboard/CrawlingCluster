@@ -1,34 +1,16 @@
 import aiohttp
+from bs4 import BeautifulSoup
 
-import configparser
-from pathlib import Path
-
+from parsing.config.properties import naver_id, naver_secret, naver_url
 from parsing.util.util_parser import (
     AsyncRequestAcquisitionHTML as ARAH,
     soup_data,
     href_from_a_tag,
 )
-from bs4 import BeautifulSoup
-
-
-# 부모 경로
-path_location = Path(__file__)
-
-# key_parser
-parser = configparser.ConfigParser()
-parser.read(f"{path_location.parent}/config/url.conf")
-
-naver_id: str = parser.get("naver", "X-Naver-Client-Id")
-naver_secret: str = parser.get("naver", "X-Naver-Client-Secret")
-naver_url: str = parser.get("naver", "NAVER_URL")
 
 
 class DaumNewsParsingDriver:
-    def __init__(
-        self, n_client_id, n_client_secret, d_header, earch_query, total_pages
-    ):
-        self.n_client_id = n_client_id
-        self.n_client_secret = n_client_secret
+    def __init__(self, d_header, earch_query, total_pages):
         self.d_header = d_header
         self.earch_query: str = earch_query
         self.total_pages: int = total_pages
@@ -75,6 +57,7 @@ class NaverNewsParsingDriver:
     """네이버 API 호출"""
 
     def __init__(self, count: int, data: str) -> None:
+
         self.count = count
         self.data = data
 
