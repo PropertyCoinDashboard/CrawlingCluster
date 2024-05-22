@@ -12,6 +12,8 @@ from parsing.util.search import AsyncRequestAcquisitionHTML as ARAH
 
 
 class AbstractAsyncNewsParsingDriver(ABC):
+    """비동기 API 호출 추상화"""
+
     def __init__(self, url: str, headers: dict[str, str]) -> None:
         self.url = url
         self.headers = headers
@@ -26,9 +28,17 @@ class AbstractAsyncNewsParsingDriver(ABC):
 
 
 class DaumNewsParsingDriver(AbstractAsyncNewsParsingDriver):
+    """다음 크롤링"""
+
     def __init__(
         self, d_header: dict[str, str], earch_query: str, total_pages: int
     ) -> None:
+        """
+        Args:
+            d_header (dict[str, str]): 다음 호출 헤더
+            earch_query (str): 긁어올 타겟
+            total_pages (int): 긁어올 횟수
+        """
         self.d_header = d_header
         self.earch_query = earch_query
         self.total_pages = total_pages
@@ -45,6 +55,15 @@ class DaumNewsParsingDriver(AbstractAsyncNewsParsingDriver):
     async def fetch_page_urls(
         self, url: str, headers: dict[str, str], page: int
     ) -> str:
+        """html 비동기 호출
+        Args:
+            url (str): URL
+            headers (dict[str, str]): 해더
+            page (int): 페이지 긁어올곳
+
+        Returns:
+            str: HTML
+        """
         self.params["p"] = page
         urls = await ARAH.async_html(
             type_="html",
@@ -55,6 +74,10 @@ class DaumNewsParsingDriver(AbstractAsyncNewsParsingDriver):
         return urls
 
     async def get_daum_news_urls(self) -> list[str]:
+        """
+        Returns:
+            list[str]: [url 를 담고 있는 a 요소들]
+        """
         print("Daum 시작합니다")
         tasks: list[str] = [
             self.fetch_page_urls(self.url, self.d_header, page)
@@ -65,6 +88,10 @@ class DaumNewsParsingDriver(AbstractAsyncNewsParsingDriver):
         return all_urls
 
     async def extract_news_urls(self) -> UrlCollect:
+        """URL 모음집
+        Returns:
+            UrlCollect: [URL, ~]
+        """
         htmls: list[str] = await self.get_daum_news_urls()
         html_data: list[list[str]] = [
             soup_data(
@@ -100,6 +127,13 @@ class NaverNewsParsingDriver(AbstractAsyncNewsParsingDriver):
         )
 
     async def fetch_page_urls(self, url: str, headers: dict[str, str]) -> dict:
+        """JSON 비동기 호출
+        Args:
+            url (str): URL
+            headers (dict[str, str]): 해더
+        Returns:
+            dict: JSON
+        """
         urls = await ARAH.async_html(
             type_="json",
             url=url,
@@ -109,17 +143,11 @@ class NaverNewsParsingDriver(AbstractAsyncNewsParsingDriver):
 
     async def extract_news_urls(self) -> UrlCollect:
         """new parsing
-
         Args:
-            target (str): 타겟 API
             items (str): 첫번째 접근
-            title (str): 타이틀
             link (str): url
-            target_url (str): 파싱하려는 API
-            build_header (dict[str, str]): 인증 헤더값
-
         Returns:
-            _type_: str
+            UrlCollect: [URL, ~]
         """
         print("Naver 시작합니다")
         res_data: dict = await self.fetch_page_urls(url=self.url, headers=self.header)

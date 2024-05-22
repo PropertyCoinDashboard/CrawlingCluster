@@ -22,6 +22,7 @@ not_request_queue = deque()
 
 
 async def url_classifier(result: list[str | dict[str, int]]) -> None:
+    """객체에서 받아온 URL 큐 분류"""
     for url in result:
         if isinstance(url, str):
             ready_queue.append(url)
@@ -32,6 +33,12 @@ async def url_classifier(result: list[str | dict[str, int]]) -> None:
 
 
 async def aiorequest_injection(start: UrlCollect, batch_size: int) -> None:
+    """starting queue에 담기 위한 시작
+
+    Args:
+        start (UrlCollect): 큐
+        batch_size (int): 묶어서 처리할 량
+    """
     while start:
         node: list[str] = start.popleft()
         if len(node) > 0:
@@ -49,6 +56,7 @@ async def aiorequest_injection(start: UrlCollect, batch_size: int) -> None:
 
 
 async def main(target: str, count: int) -> None:
+    """시작점"""
     craw = CrawlingProcess(target, count)
     craw_process: tuple[ProcessUrlCollect] = (
         craw.process_naver(),

@@ -43,6 +43,14 @@ def iterative_bfs(start_v: int, graph: dict[int, list[str]]) -> UrlCollect:
 
 
 def deep_dive_search(page: ProcessUrlCollect, objection: str) -> UrlCollect:
+    """
+    Args:
+        page (ProcessUrlCollect): 크롤링하려는 프로세스
+        objection (str): 어떤 페이지에 할것인지
+
+    Returns:
+        UrlCollect: deque([URL 뭉치들]) [startingßå]
+    """
     starting_queue = deque()
     tree: UrlDataStructure = indstrict(page)
     dfs: list[int] = recursive_dfs(1, tree)
@@ -67,13 +75,29 @@ class AsyncRequestAcquisitionHTML:
         params: dict[str, str] | None = None,
         headers: dict[str, str] | None = None,
     ) -> None:
+        """비동기 세션
+
+        Args:
+            session (aiohttp.ClientSession): 비동기 세션
+            url (str): 타겟 URL
+            params (dict[str, str] | None, optional): 파라미터. 기본은 None.
+            headers (dict[str, str] | None, optional): 헤더. 기본은 None.
+        """
         self.url = url
         self.params = params
         self.headers = headers
         self.session = session
 
     @staticmethod
-    async def asnyc_request(url: str):
+    async def asnyc_request(url: str) -> tuple[str, int]:
+        """request 요청 200 분류
+
+        Args:
+            url (str): 타겟 URL
+
+        Returns:
+            tuple[str, int]: (url, status_code)
+        """
         async with aiohttp.ClientSession() as session:
             return await AsyncRequestAcquisitionHTML(
                 session, url
@@ -86,12 +110,24 @@ class AsyncRequestAcquisitionHTML:
         params: dict[str, str] | None = None,
         headers: dict[str, str] | None = None,
     ):
+        """html or json
+
+        Args:
+            type_ (str): 타입 (HTML, JSON)
+            url (str): 타겟 URL
+            params (dict[str, str] | None, optional): 파라미터. 기본은 None.
+            headers (dict[str, str] | None, optional): 헤더. 기본은 None.
+
+        Returns:
+            _type_: 각 형태에 맞춰서 리턴 HTML(str) or JSON
+        """
         async with aiohttp.ClientSession() as session:
             return await AsyncRequestAcquisitionHTML(
                 session, url, params, headers
             ).async_source(type_)
 
     async def async_source(self, type_: str) -> str:
+        """위에 쓰고 있는 함수 본체"""
         async with self.session.get(
             url=self.url, params=self.params, headers=self.headers
         ) as response:
@@ -102,6 +138,7 @@ class AsyncRequestAcquisitionHTML:
                     return await response.json()
 
     async def asnyc_status_classifer(self) -> tuple[str, int]:
+        """위에 쓰고 있는 함수 본체"""
         async with self.session.get(
             url=self.url, params=self.params, headers=self.headers
         ) as response:
