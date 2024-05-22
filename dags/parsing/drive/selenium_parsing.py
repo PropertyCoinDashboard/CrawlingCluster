@@ -21,7 +21,7 @@ from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 
 from fake_useragent import UserAgent
 
-from parsing.gb_parsing_drive import (
+from parsing.drive.gb_parsing_drive import (
     GoogleNewsCrawlingParsingDrive,
     BingNewsCrawlingParsingDrive,
 )

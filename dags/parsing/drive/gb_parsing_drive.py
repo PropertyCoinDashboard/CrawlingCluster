@@ -4,7 +4,7 @@ Google Crawling Parsing Drive
 
 import re
 from bs4 import BeautifulSoup
-from parsing.util.util_parser import soup_data, href_from_a_tag
+from parsing.util.parser_util import soup_data, href_from_a_tag
 
 
 class GoogleNewsCrawlingParsingDrive:

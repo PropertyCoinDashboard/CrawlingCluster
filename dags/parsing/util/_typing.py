@@ -1,7 +1,7 @@
 from typing import TypedDict, Deque, Callable
 
 UrlCollect = Deque[list[str]]
-SeleniumUrlCollect = Callable[[str, int], UrlCollect]
+ProcessUrlCollect = Callable[[str, int], UrlCollect]
 
 
 class InnerData(TypedDict):

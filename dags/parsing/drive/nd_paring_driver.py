@@ -1,12 +1,13 @@
 from abc import ABC, abstractmethod
 
+import time
 import asyncio
 from collections import deque
 
 from bs4 import BeautifulSoup
 from parsing.util._typing import UrlCollect
 from parsing.config.properties import naver_id, naver_secret, naver_url
-from parsing.util.parser import soup_data, href_from_a_tag
+from parsing.util.parser_util import soup_data, href_from_a_tag
 from parsing.util.search import AsyncRequestAcquisitionHTML as ARAH
 
 
@@ -74,6 +75,7 @@ class DaumNewsParsingDriver(AbstractAsyncNewsParsingDriver):
             )
             for html in htmls
         ]
+        time.sleep(3)
         url = deque(list(map(href_from_a_tag, a_tag_list)) for a_tag_list in html_data)
         return url
 

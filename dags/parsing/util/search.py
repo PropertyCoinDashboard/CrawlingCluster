@@ -1,9 +1,9 @@
 import aiohttp
 from collections import deque
-from parsing.util.parser import indstrict
+from parsing.util.data_structure import indstrict
 from parsing.util._typing import (
     UrlDataStructure,
-    SeleniumUrlCollect,
+    ProcessUrlCollect,
     UrlCollect,
     OuterData,
 )
@@ -11,7 +11,7 @@ from parsing.util._typing import (
 
 # DFS 함수 정의
 def recursive_dfs(
-    node: int, graph: UrlDataStructure, discovered: list = []
+    node: int, graph: UrlDataStructure, discovered: list = None
 ) -> list[int]:
     if discovered is None:
         discovered = []
@@ -42,24 +42,21 @@ def iterative_bfs(start_v: int, graph: dict[int, list[str]]) -> UrlCollect:
     return start
 
 
-def deep_dive_search(
-    page: SeleniumUrlCollect, target: str, counting: int, objection: str, lock
-) -> UrlCollect:
-    with lock:
-        starting_queue = deque()
-        tree: UrlDataStructure = indstrict(page, target, counting)
-        dfs: list[int] = recursive_dfs(1, tree)
+def deep_dive_search(page: ProcessUrlCollect, objection: str) -> UrlCollect:
+    starting_queue = deque()
+    tree: UrlDataStructure = indstrict(page)
+    dfs: list[int] = recursive_dfs(1, tree)
 
-        print(f"{objection}의 검색된 노드의 순서 --> {dfs}")
-        for location in dfs:
-            try:
-                element: OuterData = tree[location]
-                for num in element.keys():
-                    urls: list[str] = iterative_bfs(num, element).pop()
-                    starting_queue.append(urls)
-            except (KeyError, IndexError):
-                continue
-        return starting_queue
+    print(f"{objection}의 검색된 노드의 순서 --> {dfs}")
+    for location in dfs:
+        try:
+            element: OuterData = tree[location]
+            for num in element.keys():
+                urls: list[str] = iterative_bfs(num, element).pop()
+                starting_queue.append(urls)
+        except (KeyError, IndexError):
+            continue
+    return starting_queue
 
 
 class AsyncRequestAcquisitionHTML:
@@ -110,6 +107,6 @@ class AsyncRequestAcquisitionHTML:
         ) as response:
             match response.status:
                 case 200:
-                    return self.url, response.status
+                    return self.url
                 case _:
-                    return self.url, response.status
+                    return {self.url: response.status}

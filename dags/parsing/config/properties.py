@@ -8,13 +8,9 @@ path_location = Path(os.getcwd())
 parser = configparser.ConfigParser()
 parser.read(f"{path_location}/parsing/config/url.conf")
 
-naver_id: str = parser.get("naver", "X-Naver-Client-Id")
-naver_secret: str = parser.get("naver", "X-Naver-Client-Secret")
-naver_url: str = parser.get("naver", "NAVER_URL")
-
-# naver_id = "6fN9FP0065139mgrkZJv"
-# naver_secret = "tAiykOYbsC"
-# naver_url = "https://openapi.naver.com/v1/search"
+# naver_id: str = parser.get("naver", "X-Naver-Client-Id")
+# naver_secret: str = parser.get("naver", "X-Naver-Client-Secret")
+# naver_url: str = parser.get("naver", "NAVER_URL")
 
 
 D_HEADERS = {

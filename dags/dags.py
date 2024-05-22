@@ -8,17 +8,10 @@ import tracemalloc
 from typing import Coroutine
 from collections import deque
 
-from parsing.config.properties import D_HEADERS
-from parsing.util._typing import UrlCollect
-from dags.parsing.util.parser import (
-    deep_dive_search,
-    AsyncRequestAcquisitionHTML as ARAH,
-)
-from parsing.nd_paring_driver import DaumNewsParsingDriver, NaverNewsParsingDriver
-from parsing.selenium_parsing import (
-    GoogleMovingElementsLocation,
-    BingMovingElementLocation,
-)
+from parsing.protocol import CrawlingProcess
+from parsing.util._typing import UrlCollect, ProcessUrlCollect
+from parsing.util.search import AsyncRequestAcquisitionHTML as ARAH
+
 
 tracemalloc.start()
 
@@ -28,28 +21,14 @@ scheduler_queue = deque()
 not_request_queue = deque()
 
 
-def process_bing(target: str, count: int) -> UrlCollect:
-    return BingMovingElementLocation(target, count).repeat_scroll()
-
-
-def process_google(target: str, count: int) -> UrlCollect:
-    return GoogleMovingElementsLocation(target, count).search_box()
-
-
-async def process_daum(target: str, count: int) -> UrlCollect:
-    return await DaumNewsParsingDriver(D_HEADERS, target, count).extract_news_urls()
-
-
-async def process_naver(target: str, count: int) -> UrlCollect:
-    return await NaverNewsParsingDriver(target, count).extract_news_urls()
-
-
-async def url_classifier(url: str, status: int) -> None:
-    match status:
-        case 200:
+async def url_classifier(result: list[str | dict[str, int]]) -> None:
+    for url in result:
+        if isinstance(url, str):
             ready_queue.append(url)
-        case _:
-            not_request_queue.append({status: url})
+        elif isinstance(url, dict):
+            not_request_queue.append(url)
+        else:
+            print(f"Type 불일치: {url}")
 
 
 async def aiorequest_injection(start: UrlCollect, batch_size: int) -> None:
@@ -66,18 +45,20 @@ async def aiorequest_injection(start: UrlCollect, batch_size: int) -> None:
                 results: list[tuple[str, int]] = await asyncio.gather(
                     *tasks, return_exceptions=True
                 )
-
-                for url_collect in results:
-                    if isinstance(url_collect, tuple):
-                        url, status = url_collect
-                        await url_classifier(url, status)
-                    else:
-                        print(f"Type 불일치: {url_collect}")
+                await url_classifier(results)
 
 
-async def aio_nd() -> None:
-    task = [process_naver("BTC", 10), process_daum("BTC", 10)]
-    return await asyncio.gather(*task)
+async def main(target: str, count: int) -> None:
+    craw = CrawlingProcess(target, count)
+    craw_process: tuple[ProcessUrlCollect] = (
+        craw.process_naver(),
+        craw.process_daum(),
+    )
+    data = await asyncio.gather(*craw_process)
+
+    return data
 
 
-asyncio.run(aio_nd())
+ad = asyncio.run(main("BTC", 2))
+for data in ad:
+    asyncio.run(aiorequest_injection(data, 20))
