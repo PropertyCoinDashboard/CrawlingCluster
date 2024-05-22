@@ -1,21 +1,36 @@
-import asyncio
-from bs4 import BeautifulSoup
+from abc import ABC, abstractmethod
 
+import asyncio
 from collections import deque
+
+from bs4 import BeautifulSoup
 from parsing.util._typing import UrlCollect
 from parsing.config.properties import naver_id, naver_secret, naver_url
-from parsing.util.util_parser import (
-    AsyncRequestAcquisitionHTML as ARAH,
-    soup_data,
-    href_from_a_tag,
-)
+from parsing.util.parser import soup_data, href_from_a_tag
+from parsing.util.search import AsyncRequestAcquisitionHTML as ARAH
 
 
-class DaumNewsParsingDriver:
-    def __init__(self, d_header, earch_query, total_pages):
+class AbstractAsyncNewsParsingDriver(ABC):
+    def __init__(self, url: str, headers: dict[str, str]) -> None:
+        self.url = url
+        self.headers = headers
+
+    @abstractmethod
+    async def fetch_page_urls(self, url: str) -> str:
+        raise NotImplementedError()
+
+    @abstractmethod
+    async def extract_news_urls(self) -> deque:
+        raise NotImplementedError()
+
+
+class DaumNewsParsingDriver(AbstractAsyncNewsParsingDriver):
+    def __init__(
+        self, d_header: dict[str, str], earch_query: str, total_pages: int
+    ) -> None:
         self.d_header = d_header
-        self.earch_query: str = earch_query
-        self.total_pages: int = total_pages
+        self.earch_query = earch_query
+        self.total_pages = total_pages
         self.url = "https://search.daum.net/search"
         self.params: dict[str, str] = {
             "nil_suggest": "btn",
@@ -27,19 +42,21 @@ class DaumNewsParsingDriver:
         }
 
     async def fetch_page_urls(
-        self, url: str, params: dict[str, str], headers: dict[str, str], page: int
+        self, url: str, headers: dict[str, str], page: int
     ) -> str:
         self.params["p"] = page
         urls = await ARAH.async_html(
+            type_="html",
             url=url,
-            params=params,
+            params=self.params,
             headers=headers,
         )
         return urls
 
     async def get_daum_news_urls(self) -> list[str]:
+        print("Daum 시작합니다")
         tasks: list[str] = [
-            self.fetch_page_urls(self.url, self.params, self.d_header, page)
+            self.fetch_page_urls(self.url, self.d_header, page)
             for page in range(1, self.total_pages + 1)
         ]
 
@@ -61,19 +78,52 @@ class DaumNewsParsingDriver:
         return url
 
 
-class NaverNewsParsingDriver:
-    """네이버 API 호출"""
+class NaverNewsParsingDriver(AbstractAsyncNewsParsingDriver):
+    """네이버 비동기 API 호출"""
 
-    def __init__(self, count: int, data: str) -> None:
-
-        self.count = count
+    def __init__(self, data: str, count: int) -> None:
+        """
+        Args:
+            data (str): 긁어올 타멧
+            count (int): 횟수
+        """
         self.data = data
-
-    def get_build_header(self) -> dict[str, str]:
-        return {
+        self.count = count
+        self.header = {
             "X-Naver-Client-Id": naver_id,
             "X-Naver-Client-Secret": naver_secret,
         }
+        self.url = (
+            f"{naver_url}/news.json?query={self.data}&start=1&display={self.count*10}"
+        )
 
-    def get_build_url(self) -> str:
-        return f"{naver_url}/news.json?query={self.data}&start=1&display={self.count}"
+    async def fetch_page_urls(self, url: str, headers: dict[str, str]) -> dict:
+        urls = await ARAH.async_html(
+            type_="json",
+            url=url,
+            headers=headers,
+        )
+        return urls
+
+    async def extract_news_urls(self) -> UrlCollect:
+        """new parsing
+
+        Args:
+            target (str): 타겟 API
+            items (str): 첫번째 접근
+            title (str): 타이틀
+            link (str): url
+            target_url (str): 파싱하려는 API
+            build_header (dict[str, str]): 인증 헤더값
+
+        Returns:
+            _type_: str
+        """
+        print("Naver 시작합니다")
+        res_data: dict = await self.fetch_page_urls(url=self.url, headers=self.header)
+
+        url: list[str] = [item["link"] for item in res_data["items"]]
+        urls: UrlCollect = deque(
+            list(url[count : count + 10] for count in range(0, len(url), self.count))
+        )
+        return urls

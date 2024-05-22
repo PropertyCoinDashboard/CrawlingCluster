@@ -14,7 +14,6 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.common.exceptions import (
     InvalidSessionIdException,
-    TimeoutException,
     NoSuchElementException,
     WebDriverException,
 )
@@ -27,7 +26,7 @@ from parsing.gb_parsing_drive import (
     BingNewsCrawlingParsingDrive,
 )
 from parsing.util._typing import UrlCollect
-from parsing.util._xpath_location import (
+from parsing.config._xpath_location import (
     WAIT_TIME,
     SCROLL_ITERATIONS,
 )
@@ -41,12 +40,12 @@ ua = UserAgent()
 def chrome_option_injection() -> webdriver.Chrome:
     # 크롬 옵션 설정
     option_chrome = uc.ChromeOptions()
-    # option_chrome.add_argument("headless")
-    # option_chrome.add_argument("--disable-gpu")
-    # option_chrome.add_argument("--disable-infobars")
-    # option_chrome.add_argument("--disable-extensions")
-    # option_chrome.add_argument("--no-sandbox")
-    # option_chrome.add_argument("--disable-dev-shm-usage")
+    option_chrome.add_argument("headless")
+    option_chrome.add_argument("--disable-gpu")
+    option_chrome.add_argument("--disable-infobars")
+    option_chrome.add_argument("--disable-extensions")
+    option_chrome.add_argument("--no-sandbox")
+    option_chrome.add_argument("--disable-dev-shm-usage")
     option_chrome.add_argument(f"user-agent={ua.random}")
 
     caps = DesiredCapabilities().CHROME

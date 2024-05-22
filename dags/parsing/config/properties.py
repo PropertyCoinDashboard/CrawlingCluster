@@ -12,8 +12,10 @@ naver_id: str = parser.get("naver", "X-Naver-Client-Id")
 naver_secret: str = parser.get("naver", "X-Naver-Client-Secret")
 naver_url: str = parser.get("naver", "NAVER_URL")
 
-daum_auth: str = parser.get("daum", "Authorization")
-daum_url: str = parser.get("daum", "DAUM_URL")
+# naver_id = "6fN9FP0065139mgrkZJv"
+# naver_secret = "tAiykOYbsC"
+# naver_url = "https://openapi.naver.com/v1/search"
+
 
 D_HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",

@@ -3,20 +3,18 @@
 # Airflow 발전시키기
 # """
 
-
 import asyncio
 import tracemalloc
 from typing import Coroutine
 from collections import deque
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from parsing.config.properties import D_HEADERS
 from parsing.util._typing import UrlCollect
-from parsing.util.util_parser import (
+from dags.parsing.util.parser import (
     deep_dive_search,
     AsyncRequestAcquisitionHTML as ARAH,
 )
-from parsing.nd_paring_driver import DaumNewsParsingDriver
+from parsing.nd_paring_driver import DaumNewsParsingDriver, NaverNewsParsingDriver
 from parsing.selenium_parsing import (
     GoogleMovingElementsLocation,
     BingMovingElementLocation,
@@ -39,11 +37,11 @@ def process_google(target: str, count: int) -> UrlCollect:
 
 
 async def process_daum(target: str, count: int) -> UrlCollect:
-    news_search = DaumNewsParsingDriver(D_HEADERS, target, count)
+    return await DaumNewsParsingDriver(D_HEADERS, target, count).extract_news_urls()
 
-    # 비동기로 네이버와 카카오 뉴스 URL 가져오기
-    daum_news_urls_task = await news_search.extract_news_urls()
-    return daum_news_urls_task
+
+async def process_naver(target: str, count: int) -> UrlCollect:
+    return await NaverNewsParsingDriver(target, count).extract_news_urls()
 
 
 async def url_classifier(url: str, status: int) -> None:
@@ -77,16 +75,9 @@ async def aiorequest_injection(start: UrlCollect, batch_size: int) -> None:
                         print(f"Type 불일치: {url_collect}")
 
 
-with ThreadPoolExecutor(3) as poll:
-    task = [
-        poll.submit(deep_dive_search, process, "BTC", 2, objection)
-        for process, objection in zip(
-            (process_google, process_bing, process_daum), ("google", "bing", "daum")
-        )
-    ]
-
-    for data in as_completed(task):
-        asyncio.run(aiorequest_injection(data.result(), 20))
+async def aio_nd() -> None:
+    task = [process_naver("BTC", 10), process_daum("BTC", 10)]
+    return await asyncio.gather(*task)
 
 
-print(len(ready_queue))
+asyncio.run(aio_nd())
