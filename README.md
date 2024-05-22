@@ -15,77 +15,81 @@ API 끌고온것듯
 
 셀레니움 동적 크롤링 대상 
 - google
-- bing
-- Korbit
-  - coin symbol 
-- Bithumb
-  - coin symbol
- 
+- bing 
 
 ### 실행 (멀티 프로세싱으로 했으나 Airflow로 각각 원하는 키워드에 스케줄링 고려)
-- python test.py
+- python dags.py
 ```python
 """
 기능 테스트
 """
+
 import asyncio
-from multiprocessing import Process
+import tracemalloc
+from typing import Coroutine
+from collections import deque
 
-from parsing.naver_daum_news_api import (
-    NaverNewsParsingDriver,
-    DaumNewsParsingDriver,
-)
-from parsing.selenium_parsing import (
-    KorbitSymbolParsingUtility,
-    BithumSymbolParsingUtility,
-)
-from parsing.selenium_parsing import (
-    GoogleMovingElementsLocation,
-    BingMovingElementLocation,
-)
+from parsing.protocol import CrawlingProcess
+from parsing.util._typing import UrlCollect, ProcessUrlCollect
+from parsing.util.search import AsyncRequestAcquisitionHTML as ARAH
 
 
-async def main() -> None:
+tracemalloc.start()
+
+# 데이터 적재 하기 위한 추상화
+ready_queue = deque()
+scheduler_queue = deque()
+not_request_queue = deque()
+
+
+async def url_classifier(result: list[str | dict[str, int]]) -> None:
+    """객체에서 받아온 URL 큐 분류"""
+    for url in result:
+        if isinstance(url, str):
+            ready_queue.append(url)
+        elif isinstance(url, dict):
+            not_request_queue.append(url)
+        else:
+            print(f"Type 불일치: {url}")
+
+
+async def aiorequest_injection(start: UrlCollect, batch_size: int) -> None:
+    """starting queue에 담기 위한 시작
+
+    Args:
+        start (UrlCollect): 큐
+        batch_size (int): 묶어서 처리할 량
     """
-    테스트
-    """
-    await asyncio.gather(
-        NaverNewsParsingDriver(10, "BTC").get_naver_news_data(),
-        DaumNewsParsingDriver(10, "비트코인").get_daum_news_data(),
+    while start:
+        node: list[str] = start.popleft()
+        if len(node) > 0:
+            print(f"묶음 처리 진행합니다 --> {len(node)}개 진행합니다 ")
+            for count in range(0, len(node), batch_size):
+                batch: list[str] = node[count : count + batch_size]
+
+                tasks: list[Coroutine[tuple[str, int]]] = [
+                    ARAH.asnyc_request(url) for url in batch
+                ]
+                results: list[tuple[str, int]] = await asyncio.gather(
+                    *tasks, return_exceptions=True
+                )
+                await url_classifier(results)
+
+
+async def main(target: str, count: int) -> None:
+    """시작점"""
+    craw = CrawlingProcess(target, count)
+    craw_process: tuple[ProcessUrlCollect] = (
+        craw.process_naver(),
+        craw.process_daum(),
     )
+    data = await asyncio.gather(*craw_process)
+
+    return data
 
 
-def process_bithum() -> None:
-    BithumSymbolParsingUtility().close_bit_page_and_get_source()
+ad = asyncio.run(main("BTC", 2))
+for data in ad:
+    asyncio.run(aiorequest_injection(data, 20))
 
-
-def process_korbit() -> None:
-    KorbitSymbolParsingUtility().korbit_page()
-
-
-def process_google() -> None:
-    GoogleMovingElementsLocation("비트코인", 5).search_box()
-
-
-def process_bing() -> None:
-    BingMovingElementLocation("비트코인", 5).repeat_scroll()
-
-
-if __name__ == "__main__":
-    data = [
-        process_bithum,
-        process_korbit,
-        process_google,
-        process_bing,
-        asyncio.run(main()),
-    ]
-    processes = []
-
-    for p in data:
-        process = Process(target=p)
-        processes.append(process)
-        process.start()
-
-    for pp in processes:
-        pp.join()
 ```
