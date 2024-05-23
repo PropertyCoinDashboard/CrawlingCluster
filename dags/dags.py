@@ -19,15 +19,15 @@ mysql_hook = MySqlHook(mysql_conn_id=mysql_conn_id)
 def naver_again(count: int, target: str) -> UrlCollect:
     loop = asyncio.get_event_loop()
     result = loop.run_until_complete(CrawlingProcess(target, count).process_naver())
-    serialization = json.dumps(list(result))
-    return serialization
+    data = [i for i in result]
+    return data
 
 
 def daum_again(count: int, target: str) -> UrlCollect:
     loop = asyncio.get_event_loop()
     result = loop.run_until_complete(CrawlingProcess(target, count).process_daum())
-    serialization = json.dumps(list(result))
-    return serialization
+    data = [i for i in result]
+    return data
 
 
 with DAG(
