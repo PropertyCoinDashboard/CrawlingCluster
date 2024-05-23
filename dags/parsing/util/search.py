@@ -4,6 +4,7 @@ from bs4 import BeautifulSoup
 import aiohttp
 from collections import deque
 from parsing.util.data_structure import indstrict
+from parsing.util.parser_util import url_addition
 from parsing.util._typing import (
     UrlDataStructure,
     ProcessUrlCollect,
@@ -27,7 +28,7 @@ def recursive_dfs(
     return discovered
 
 
-def bfs_crawl(start_url, max_depth=2):
+def bfs_crawl(start_url: str, max_depth=2):
     visited = set()
     queue = deque([(start_url, 0)])
 
@@ -53,7 +54,10 @@ def bfs_crawl(start_url, max_depth=2):
             time.sleep(2)
             for link in links:
                 if link.startswith("/"):
-                    link = start_url + link  # 상대 경로를 절대 경로로 변환
+                    link = url_addition(start_url)
+                elif not link.startswith("http" or "https"):
+                    continue  # 다른 프로토콜이나 상대 경로가 아닌 링크는 무시
+
                 if link not in visited:
                     queue.append((link, depth + 1))
 

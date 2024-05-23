@@ -9,6 +9,7 @@ from typing import Coroutine
 from collections import deque
 
 from parsing.protocol import CrawlingProcess
+from parsing.db.connection import connection_main
 from parsing.util._typing import UrlCollect, ProcessUrlCollect
 from parsing.util.search import AsyncRequestAcquisitionHTML as ARAH, bfs_crawl
 
@@ -67,13 +68,6 @@ async def main(target: str, count: int) -> list[UrlCollect]:
     return data
 
 
-ad = asyncio.run(main("BTC", 2))
+ad = asyncio.run(main("BTC", 10))
 for data in ad:
     asyncio.run(aiorequest_injection(data, 20))
-
-
-while len(ready_queue) > 0:
-    data = ready_queue.popleft()
-    print(data)
-
-    bfs_crawl(data)

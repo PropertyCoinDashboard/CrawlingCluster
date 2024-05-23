@@ -125,6 +125,7 @@ class BingNewsCrawlingParsingDrive:
             "algocore",
             "news-card newsitem cardcommon",
         )
+        print(detect)
         print(f"Bing 다음요소로 수집 진행합니다 --> {detect}")
         div_class_algocore: list[str] = soup_data(
             html_data=html_source,
