@@ -9,7 +9,7 @@ from typing import Coroutine
 from collections import deque
 
 from parsing.protocol import CrawlingProcess
-from parsing.db.connection import connection_main
+from parsing.db.hook import connection_hook
 from parsing.util._typing import UrlCollect, ProcessUrlCollect
 from parsing.util.search import AsyncRequestAcquisitionHTML as ARAH, bfs_crawl
 
