@@ -1,14 +1,30 @@
 from abc import ABC, abstractmethod
 
+import os
+import configparser
+from pathlib import Path
 import time
 import asyncio
 from collections import deque
 
 from bs4 import BeautifulSoup
+
+# from parsing.db.hook import connection_hook
 from parsing.util._typing import UrlCollect
-from parsing.config.properties import naver_id, naver_secret, naver_url
 from parsing.util.parser_util import soup_data, href_from_a_tag
 from parsing.util.search import AsyncRequestAcquisitionHTML as ARAH
+
+
+# 부모 경로
+path_location = Path(__file__)
+print(path_location)
+# key_parser
+parser = configparser.ConfigParser()
+parser.read(f"{path_location.parent.parent}/config/url.conf")
+
+naver_id: str = parser.get("naver", "X-Naver-Client-Id")
+naver_secret: str = parser.get("naver", "X-Naver-Client-Secret")
+naver_url: str = parser.get("naver", "NAVER_URL")
 
 
 class AbstractAsyncNewsParsingDriver(ABC):
@@ -106,6 +122,13 @@ class DaumNewsParsingDriver(AbstractAsyncNewsParsingDriver):
         url = deque(list(map(href_from_a_tag, a_tag_list)) for a_tag_list in html_data)
         return url
 
+    # def first_data_saving(self) -> None:
+    #     data = asyncio.run(self.extract_news_urls())
+    #     while data:
+    #         urls = data.popleft()
+    #         for data in urls:
+    #             connection_hook(data)
+
 
 class NaverNewsParsingDriver(AbstractAsyncNewsParsingDriver):
     """네이버 비동기 API 호출"""
@@ -157,3 +180,10 @@ class NaverNewsParsingDriver(AbstractAsyncNewsParsingDriver):
             list(url[count : count + 10] for count in range(0, len(url), self.count))
         )
         return urls
+
+    # def first_data_saving(self) -> None:
+    #     data = asyncio.run(self.extract_news_urls())
+    #     while data:
+    #         urls = data.popleft()
+    #         for data in urls:
+    #             connection_hook(data)

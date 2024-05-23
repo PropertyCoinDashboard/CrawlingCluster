@@ -1,73 +1,62 @@
-# """
-# 기능 테스트
-# Airflow 발전시키기
-# """
-
 import asyncio
-import tracemalloc
-from typing import Coroutine
-from collections import deque
+import json
+from parsing.util._typing import UrlCollect
 
+from airflow import DAG
+from airflow.utils.dates import days_ago
+from airflow.operators.python import PythonOperator
+from airflow.operators.bash import BashOperator
+from airflow.providers.mysql.hooks.mysql import MySqlHook
+
+from parsing.db.hook import first_data_saving
 from parsing.protocol import CrawlingProcess
-from parsing.db.hook import connection_hook
-from parsing.util._typing import UrlCollect, ProcessUrlCollect
-from parsing.util.search import AsyncRequestAcquisitionHTML as ARAH, bfs_crawl
+
+# # # MySQL 연결 설정
+mysql_conn_id = "airflow-mysql"
+mysql_hook = MySqlHook(mysql_conn_id=mysql_conn_id)
 
 
-tracemalloc.start()
-
-# 데이터 적재 하기 위한 추상화
-ready_queue = deque()
-scheduler_queue = deque()
-not_request_queue = deque()
-
-
-async def url_classifier(result: list[str | dict[str, int]]) -> None:
-    """객체에서 받아온 URL 큐 분류"""
-    for url in result:
-        if isinstance(url, str):
-            ready_queue.append(url)
-        elif isinstance(url, dict):
-            not_request_queue.append(url)
-        else:
-            print(f"Type 불일치: {url}")
+def naver_again(count: int, target: str) -> UrlCollect:
+    loop = asyncio.get_event_loop()
+    result = loop.run_until_complete(CrawlingProcess(target, count).process_naver())
+    serialization = json.dumps(list(result))
+    return serialization
 
 
-async def aiorequest_injection(start: UrlCollect, batch_size: int) -> None:
-    """starting queue에 담기 위한 시작
-
-    Args:
-        start (UrlCollect): 큐
-        batch_size (int): 묶어서 처리할 량
-    """
-    while start:
-        node: list[str] = start.popleft()
-        if len(node) > 0:
-            print(f"묶음 처리 진행합니다 --> {len(node)}개 진행합니다 ")
-            for count in range(0, len(node), batch_size):
-                batch: list[str] = node[count : count + batch_size]
-
-                tasks: list[Coroutine[tuple[str, int]]] = [
-                    ARAH.asnyc_request(url) for url in batch
-                ]
-                results: list[tuple[str, int]] = await asyncio.gather(
-                    *tasks, return_exceptions=True
-                )
-                await url_classifier(results)
+def daum_again(count: int, target: str) -> UrlCollect:
+    loop = asyncio.get_event_loop()
+    result = loop.run_until_complete(CrawlingProcess(target, count).process_daum())
+    serialization = json.dumps(list(result))
+    return serialization
 
 
-async def main(target: str, count: int) -> list[UrlCollect]:
-    """시작점"""
-    craw = CrawlingProcess(target, count)
-    craw_process: tuple[ProcessUrlCollect] = (
-        craw.process_naver(),
-        craw.process_daum(),
+with DAG(
+    dag_id="Crawling_data_API", start_date=days_ago(5), schedule_interval=None
+) as dag:
+
+    start_operator = BashOperator(
+        task_id="News_API_start", bash_command="echo crawling start!!", dag=dag
     )
-    data = await asyncio.gather(*craw_process)
 
-    return data
+    naver_api_operator = PythonOperator(
+        task_id="get_news_api_naver",
+        python_callable=naver_again,
+        op_args=[10, "BTC"],
+        dag=dag,
+    )
 
+    daum_api_operator = PythonOperator(
+        task_id="get_news_api_daum",
+        python_callable=daum_again,
+        op_args=[10, "BTC"],
+        dag=dag,
+    )
 
-ad = asyncio.run(main("BTC", 10))
-for data in ad:
-    asyncio.run(aiorequest_injection(data, 20))
+    saving = PythonOperator(
+        task_id="mysql_data_saving",
+        python_callable=first_data_saving,
+        provide_context=True,
+        dag=dag,
+    )
+
+    start_operator >> [naver_api_operator, daum_api_operator] >> saving
