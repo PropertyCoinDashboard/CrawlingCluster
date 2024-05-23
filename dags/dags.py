@@ -10,7 +10,7 @@ from collections import deque
 
 from parsing.protocol import CrawlingProcess
 from parsing.util._typing import UrlCollect, ProcessUrlCollect
-from parsing.util.search import AsyncRequestAcquisitionHTML as ARAH
+from parsing.util.search import AsyncRequestAcquisitionHTML as ARAH, bfs_crawl
 
 
 tracemalloc.start()
@@ -55,7 +55,7 @@ async def aiorequest_injection(start: UrlCollect, batch_size: int) -> None:
                 await url_classifier(results)
 
 
-async def main(target: str, count: int) -> None:
+async def main(target: str, count: int) -> list[UrlCollect]:
     """시작점"""
     craw = CrawlingProcess(target, count)
     craw_process: tuple[ProcessUrlCollect] = (
@@ -70,3 +70,10 @@ async def main(target: str, count: int) -> None:
 ad = asyncio.run(main("BTC", 2))
 for data in ad:
     asyncio.run(aiorequest_injection(data, 20))
+
+
+while len(ready_queue) > 0:
+    data = ready_queue.popleft()
+    print(data)
+
+    bfs_crawl(data)

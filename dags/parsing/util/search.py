@@ -1,11 +1,14 @@
+import time
+import requests
+from bs4 import BeautifulSoup
 import aiohttp
 from collections import deque
 from parsing.util.data_structure import indstrict
 from parsing.util._typing import (
     UrlDataStructure,
     ProcessUrlCollect,
-    UrlCollect,
     OuterData,
+    UrlCollect,
 )
 
 
@@ -22,6 +25,40 @@ def recursive_dfs(
             recursive_dfs(n, graph, discovered)
 
     return discovered
+
+
+def bfs_crawl(start_url, max_depth=2):
+    visited = set()
+    queue = deque([(start_url, 0)])
+
+    while queue:
+        url, depth = queue.popleft()
+        if depth > max_depth:
+            break
+
+        if url in visited:
+            continue
+
+        visited.add(url)
+        print(f"Depth: {depth}, URL: {url}")
+
+        try:
+            response = requests.get(url)
+            if response.status_code != 200:
+                continue
+
+            soup = BeautifulSoup(response.text, "html.parser")
+
+            links = [a["href"] for a in soup.find_all("a", href=True)]
+            time.sleep(2)
+            for link in links:
+                if link.startswith("/"):
+                    link = start_url + link  # 상대 경로를 절대 경로로 변환
+                if link not in visited:
+                    queue.append((link, depth + 1))
+
+        except Exception as e:
+            print(f"URL 변환 X {url}: {e}")
 
 
 # BFS 함수 정의
@@ -109,7 +146,7 @@ class AsyncRequestAcquisitionHTML:
         url: str,
         params: dict[str, str] | None = None,
         headers: dict[str, str] | None = None,
-    ):
+    ) -> str | dict:
         """html or json
 
         Args:
@@ -126,7 +163,7 @@ class AsyncRequestAcquisitionHTML:
                 session, url, params, headers
             ).async_source(type_)
 
-    async def async_source(self, type_: str) -> str:
+    async def async_source(self, type_: str) -> str | dict:
         """위에 쓰고 있는 함수 본체"""
         async with self.session.get(
             url=self.url, params=self.params, headers=self.headers

@@ -85,7 +85,7 @@ def soup_data(
     soup: BeautifulSoup = None,
 ) -> list:
     """
-    Parse the HTML data using BeautifulSoup
+    파싱 본체
     """
     if soup is None:
         soup = BeautifulSoup(html_data, "lxml")
