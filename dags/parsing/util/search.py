@@ -178,7 +178,7 @@ class AsyncRequestAcquisitionHTML:
                 case "json":
                     return await response.json()
 
-    async def asnyc_status_classifer(self) -> tuple[str, int]:
+    async def asnyc_status_classifer(self) -> str | dict[str, int]:
         """위에 쓰고 있는 함수 본체"""
         async with self.session.get(
             url=self.url, params=self.params, headers=self.headers

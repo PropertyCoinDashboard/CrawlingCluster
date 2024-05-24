@@ -6,9 +6,9 @@
 import asyncio
 import tracemalloc
 from typing import Coroutine
+from parsing.db.hook import ready_request_status, not_ready_status
 
 from parsing.util.search import AsyncRequestAcquisitionHTML as ARAH
-from parsing.db.hook import ready_request_status, not_ready_status
 
 tracemalloc.start()
 
@@ -38,10 +38,10 @@ async def aiorequest_injection(start: list[str], batch_size: int) -> None:
             for count in range(0, len(node), batch_size):
                 batch: list[str] = node[count : count + batch_size]
 
-                tasks: list[Coroutine[tuple[str, int]]] = [
+                tasks: list[Coroutine[str | dict[str, int]]] = [
                     ARAH.asnyc_request(url) for url in batch
                 ]
-                results: list[tuple[str, int]] = await asyncio.gather(
+                results: list[str | dict[str, int]] = await asyncio.gather(
                     *tasks, return_exceptions=True
                 )
                 await url_classifier(results)

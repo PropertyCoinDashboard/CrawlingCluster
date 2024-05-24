@@ -1,4 +1,5 @@
 import asyncio
+from typing import Any
 
 from airflow import DAG
 from airflow.utils.dates import days_ago
@@ -10,7 +11,7 @@ from parsing.asnyc_protocol import aiorequest_injection
 from parsing.operators.crawling import CrawlingOperator
 
 
-def status_200_injection(**context) -> None:
+def status_200_injection(**context: dict[str, Any]) -> list[list[str | dict[str, int]]]:
     data = context["ti"].xcom_pull(task_ids=context["task"].upstream_task_ids)
     loop = asyncio.get_event_loop()
     for i in data:
@@ -49,7 +50,7 @@ with DAG(
     )
 
     saving = PythonOperator(
-        task_id="mysql_data_saving",
+        task_id="total_data_saving",
         python_callable=first_data_saving,
         provide_context=True,
         dag=dag,

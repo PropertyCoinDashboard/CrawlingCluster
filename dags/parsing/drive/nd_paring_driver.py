@@ -9,7 +9,6 @@ from collections import deque
 
 from bs4 import BeautifulSoup
 
-# from parsing.db.hook import connection_hook
 from parsing.util._typing import UrlCollect
 from parsing.util.parser_util import soup_data, href_from_a_tag
 from parsing.util.search import AsyncRequestAcquisitionHTML as ARAH

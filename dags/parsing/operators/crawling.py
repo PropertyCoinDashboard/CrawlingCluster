@@ -14,17 +14,13 @@ class CrawlingOperator(BaseOperator):
         self.target = target
         self.site = site
 
+    # fmt: off
     def execute(self, context) -> list[list[str]]:
         loop = asyncio.get_event_loop()
         if self.site == "naver":
-            result = loop.run_until_complete(
-                CrawlingProcess(self.target, self.count).process_naver()
-            )
-
+            result = loop.run_until_complete(CrawlingProcess(self.target, self.count).process_naver())
         elif self.site == "daum":
-            result = loop.run_until_complete(
-                CrawlingProcess(self.target, self.count).process_daum()
-            )
+            result = loop.run_until_complete(CrawlingProcess(self.target, self.count).process_daum())
         else:
             raise ValueError("Invalid site specified")
 
