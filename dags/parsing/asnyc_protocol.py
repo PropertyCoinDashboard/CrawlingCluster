@@ -6,26 +6,20 @@
 import asyncio
 import tracemalloc
 from typing import Coroutine
-from collections import deque
 
-from parsing.util._typing import UrlCollect
 from parsing.util.search import AsyncRequestAcquisitionHTML as ARAH
-
+from parsing.db.hook import ready_request_status, not_ready_status
 
 tracemalloc.start()
-
-# 데이터 적재 하기 위한 추상화
-ready_queue = deque()
-not_request_queue = deque()
 
 
 async def url_classifier(result: list[str | dict[str, int]]) -> None:
     """객체에서 받아온 URL 큐 분류"""
     for url in result:
         if isinstance(url, str):
-            ready_queue.append(url)
+            ready_request_status(url)
         elif isinstance(url, dict):
-            not_request_queue.append(url)
+            not_ready_status(url)
         else:
             print(f"Type 불일치: {url}")
 
