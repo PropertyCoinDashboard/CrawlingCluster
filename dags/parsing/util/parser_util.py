@@ -15,9 +15,6 @@ from bs4 import BeautifulSoup
 path_location = Path(__file__).parent.parent.parent
 
 
-# 데이터 정의
-
-
 def csv_saving(data: list, csv_file_name: str) -> pd.DataFrame:
     """coin symbol csv saving
 
