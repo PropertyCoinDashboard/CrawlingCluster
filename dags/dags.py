@@ -1,6 +1,4 @@
 import asyncio
-import json
-from parsing.util._typing import UrlCollect
 
 from airflow import DAG
 from airflow.utils.dates import days_ago
@@ -9,6 +7,7 @@ from airflow.operators.bash import BashOperator
 from airflow.providers.mysql.hooks.mysql import MySqlHook
 
 from parsing.db.hook import first_data_saving
+from parsing.asnyc_protocol import aiorequest_injection
 from parsing.protocol import CrawlingProcess
 
 # # # MySQL 연결 설정
@@ -16,18 +15,25 @@ mysql_conn_id = "airflow-mysql"
 mysql_hook = MySqlHook(mysql_conn_id=mysql_conn_id)
 
 
-def naver_again(count: int, target: str) -> UrlCollect:
+def naver_again(count: int, target: str) -> list[list[str]]:
     loop = asyncio.get_event_loop()
     result = loop.run_until_complete(CrawlingProcess(target, count).process_naver())
     data = [i for i in result]
     return data
 
 
-def daum_again(count: int, target: str) -> UrlCollect:
+def daum_again(count: int, target: str) -> list[list[str]]:
     loop = asyncio.get_event_loop()
     result = loop.run_until_complete(CrawlingProcess(target, count).process_daum())
     data = [i for i in result]
     return data
+
+
+def status_200_injection(**context) -> None:
+    data = context["ti"].xcom_pull(task_ids=context["task"].upstream_task_ids)
+    loop = asyncio.get_event_loop()
+    for i in data:
+        loop.run_until_complete(aiorequest_injection(i, 20))
 
 
 with DAG(
@@ -52,6 +58,13 @@ with DAG(
         dag=dag,
     )
 
+    status = PythonOperator(
+        task_id="200_status_classifer",
+        python_callable=status_200_injection,
+        provide_context=True,
+        dag=dag,
+    )
+
     saving = PythonOperator(
         task_id="mysql_data_saving",
         python_callable=first_data_saving,
@@ -60,3 +73,4 @@ with DAG(
     )
 
     start_operator >> [naver_api_operator, daum_api_operator] >> saving
+    [naver_api_operator, daum_api_operator] >> status

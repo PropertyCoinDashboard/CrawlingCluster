@@ -17,7 +17,6 @@ from parsing.util.search import AsyncRequestAcquisitionHTML as ARAH
 
 # 부모 경로
 path_location = Path(__file__)
-print(path_location)
 # key_parser
 parser = configparser.ConfigParser()
 parser.read(f"{path_location.parent.parent}/config/url.conf")

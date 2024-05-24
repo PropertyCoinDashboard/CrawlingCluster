@@ -10,7 +10,9 @@ def connection_hook(url: list[str]) -> None:
 
 
 def first_data_saving(**context: dict[str, Any]) -> None:
-    urls = context["ti"].xcom_pull(task_ids=context["task"].upstream_task_ids)
+    urls: dict[str, list[list[str]]] = context["ti"].xcom_pull(
+        task_ids=context["task"].upstream_task_ids
+    )
     for data in urls:
         for i in data:
             connection_hook(i)

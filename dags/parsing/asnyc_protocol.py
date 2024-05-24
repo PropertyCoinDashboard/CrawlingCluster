@@ -8,16 +8,14 @@ import tracemalloc
 from typing import Coroutine
 from collections import deque
 
-from parsing.protocol import CrawlingProcess
-from parsing.util._typing import UrlCollect, ProcessUrlCollect
-from parsing.util.search import AsyncRequestAcquisitionHTML as ARAH, bfs_crawl
+from parsing.util._typing import UrlCollect
+from parsing.util.search import AsyncRequestAcquisitionHTML as ARAH
 
 
 tracemalloc.start()
 
 # 데이터 적재 하기 위한 추상화
 ready_queue = deque()
-scheduler_queue = deque()
 not_request_queue = deque()
 
 
@@ -32,7 +30,7 @@ async def url_classifier(result: list[str | dict[str, int]]) -> None:
             print(f"Type 불일치: {url}")
 
 
-async def aiorequest_injection(start: UrlCollect, batch_size: int) -> None:
+async def aiorequest_injection(start: list[str], batch_size: int) -> None:
     """starting queue에 담기 위한 시작
 
     Args:
@@ -40,7 +38,7 @@ async def aiorequest_injection(start: UrlCollect, batch_size: int) -> None:
         batch_size (int): 묶어서 처리할 량
     """
     while start:
-        node: list[str] = start.popleft()
+        node: list[str] = start.pop()
         if len(node) > 0:
             print(f"묶음 처리 진행합니다 --> {len(node)}개 진행합니다 ")
             for count in range(0, len(node), batch_size):
