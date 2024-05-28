@@ -1,4 +1,5 @@
 import asyncio
+from parsing.util._typing import UrlCollect
 
 from airflow.models import BaseOperator
 from airflow.utils.decorators import apply_defaults
@@ -14,21 +15,21 @@ class CrawlingOperator(BaseOperator):
         self.target = target
         self.site = site
 
+    async def naver_again(self) -> UrlCollect:
+        return await CrawlingProcess(self.target, self.count).process_naver()
+
+    async def daum_again(self) -> UrlCollect:
+        return await CrawlingProcess(self.target, self.count).process_daum()
+
     # fmt: off
     def execute(self, context) -> list[list[str]]:
         loop = asyncio.get_event_loop()
         if self.site == "naver":
-            result = loop.run_until_complete(CrawlingProcess(self.target, self.count).process_naver())
+            result = loop.run_until_complete(self.naver_again())
         elif self.site == "daum":
-            result = loop.run_until_complete(CrawlingProcess(self.target, self.count).process_daum())
+            result = loop.run_until_complete(self.daum_again())
         else:
             raise ValueError("Invalid site specified")
 
         data = [i for i in result]
         return data
-
-    async def naver_again(self):
-        return await CrawlingProcess(self.target, self.count).process_naver()
-
-    async def daum_again(self):
-        return await CrawlingProcess(self.target, self.count).process_daum()
