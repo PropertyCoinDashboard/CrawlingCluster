@@ -120,13 +120,6 @@ class DaumNewsParsingDriver(AbstractAsyncNewsParsingDriver):
         url = deque(list(map(href_from_a_tag, a_tag_list)) for a_tag_list in html_data)
         return url
 
-    # def first_data_saving(self) -> None:
-    #     data = asyncio.run(self.extract_news_urls())
-    #     while data:
-    #         urls = data.popleft()
-    #         for data in urls:
-    #             connection_hook(data)
-
 
 class NaverNewsParsingDriver(AbstractAsyncNewsParsingDriver):
     """네이버 비동기 API 호출"""
@@ -178,10 +171,3 @@ class NaverNewsParsingDriver(AbstractAsyncNewsParsingDriver):
             list(url[count : count + 10] for count in range(0, len(url), self.count))
         )
         return urls
-
-    # def first_data_saving(self) -> None:
-    #     data = asyncio.run(self.extract_news_urls())
-    #     while data:
-    #         urls = data.popleft()
-    #         for data in urls:
-    #             connection_hook(data)

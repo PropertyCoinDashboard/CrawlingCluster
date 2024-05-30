@@ -134,11 +134,10 @@ class BingNewsCrawlingParsingDrive:
             soup=BeautifulSoup(html_source, "lxml"),
         )
 
-        data = []
-        for div_1 in div_class_algocore:
-            for div_2 in self.div_in_class(div_1, detect[1]):
-                url = href_from_a_tag(div_2, "url")
-                # title = href_from_text_preprocessing(div_2["data-title"][:20])
-                data.append(url)
+        data = [
+            href_from_a_tag(div_2, "url")
+            for div_1 in div_class_algocore
+            for div_2 in self.div_in_class(div_1, detect[1])
+        ]
 
         return data
