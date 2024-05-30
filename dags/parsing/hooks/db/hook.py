@@ -36,7 +36,6 @@ async def url_classifier(**context: list[str | dict[str, int]]) -> None:
     urls: dict[str, list[list[str]]] = context["ti"].xcom_pull(
         task_ids=context["task"].upstream_task_ids
     )
-    print(urls)
     for data in urls:
         for i in data:
             if isinstance(i, str):

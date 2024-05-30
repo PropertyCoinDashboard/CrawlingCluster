@@ -6,7 +6,7 @@ from airflow.utils.dates import days_ago
 from airflow.operators.python import PythonOperator
 from airflow.operators.bash import BashOperator
 
-from parsing.db.hook import first_data_saving
+from parsing.hooks.db.hook import first_data_saving
 from parsing.asnyc_protocol import aiorequest_injection
 from parsing.operators.crawling import CrawlingOperator
 
