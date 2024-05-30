@@ -1,4 +1,3 @@
-import time
 import random
 import urllib3
 
@@ -119,7 +118,7 @@ class GoogleMovingElementsLocation(GoogleNewsCrawlingParsingDrive):
             "return document.body.scrollHeight"
         )
         for i in range(1, SCROLL_ITERATIONS):
-            time.sleep(5)
+            self.driver.implicitly_wait(random.uniform(5.0, 10.0))
             scroll_cal: float = prev_height / SCROLL_ITERATIONS * i
             self.driver.execute_script(f"window.scrollTo(0, {scroll_cal})")
 
@@ -145,7 +144,7 @@ class GoogleMovingElementsLocation(GoogleNewsCrawlingParsingDrive):
                 url_data: list[str] = self.news_info_collect(self.driver.page_source)
                 data.append(url_data)
                 next_page_button.click()
-                time.sleep(5)
+                self.driver.implicitly_wait(random.uniform(5.0, 10.0))
                 self.page_scroll_moving()
             else:
                 print("google 수집 종료")
@@ -225,7 +224,7 @@ class BingMovingElementLocation(BingNewsCrawlingParsingDrive):
                 )
 
                 # 전체 스크롤이 늘어날 때까지 대기
-                time.sleep(5)
+                self.driver.implicitly_wait(random.uniform(5.0, 10.0))
 
                 # 늘어난 스크롤 높이
                 scroll_height: int = self.driver.execute_script(
@@ -246,7 +245,7 @@ class BingMovingElementLocation(BingNewsCrawlingParsingDrive):
                     scroll_location = self.driver.execute_script(
                         "return document.body.scrollHeight"
                     )
-            time.sleep(5)
+            self.driver.implicitly_wait(random.uniform(5.0, 10.0))
             return data
         except InvalidSessionIdException:
             pass
