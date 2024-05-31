@@ -13,7 +13,7 @@ from parsing.operators.crawling import CrawlingOperator
 from parsing.operators.selenium_operators import SeleniumOperator
 
 
-def status_200_injection(**context: dict[str, Any]) -> list[list[str | dict[str, int]]]:
+def status_200_injection(**context: dict[str, Any]) -> None:
     data = context["ti"].xcom_pull(task_ids=context["task"].upstream_task_ids)
     loop = asyncio.get_event_loop()
     for i in data:
@@ -35,21 +35,17 @@ with DAG(
         task_id="News_API_start", bash_command="echo crawling start!!", dag=dag
     )
 
-    naver_task = CrawlingOperator(
-        task_id="crawl_naver",
-        count=10,
-        target="BTC",
-        site="naver",
-        dag=dag,
-    )
-
-    daum_task = CrawlingOperator(
-        task_id="crawl_daum",
-        count=10,
-        target="BTC",
-        site="daum",
-        dag=dag,
-    )
+    crawl_tasks = []
+    for site in ["naver", "daum"]:
+        crawl_task = CrawlingOperator(
+            task_id=f"crawl_{site}",
+            count=10,
+            target="BTC",
+            site=site,
+            dag=dag,
+        )
+        start_operator >> crawl_task
+        crawl_tasks.append(crawl_task)
 
     google_task = CrawlingOperator(
         task_id="crawl_google",
@@ -90,7 +86,11 @@ with DAG(
         dag=dag,
     )
 
-    start_operator >> [naver_task, daum_task, google_task]
-    google_task >> check_xcom_task >> google_2nd_task
-    [naver_task, daum_task, google_task, google_2nd_task] >> status
-    [naver_task, daum_task, google_2nd_task] >> saving
+    start_operator >> crawl_tasks
+    start_operator >> google_task
+    for crawl_task in crawl_tasks:
+        crawl_task >> status
+        crawl_task >> saving
+
+    google_task >> [status, saving]
+    google_task >> check_xcom_task >> google_2nd_task >> [saving, status]
