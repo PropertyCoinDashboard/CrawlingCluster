@@ -6,7 +6,7 @@
 import asyncio
 import tracemalloc
 from typing import Coroutine
-from parsing.db.hook import ready_request_status, not_ready_status
+from parsing.hooks.db.hook import ready_request_status, not_ready_status
 
 from parsing.util.search import AsyncRequestAcquisitionHTML as ARAH
 

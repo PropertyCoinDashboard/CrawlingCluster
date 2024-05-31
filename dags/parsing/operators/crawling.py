@@ -21,6 +21,9 @@ class CrawlingOperator(BaseOperator):
     async def daum_again(self) -> UrlCollect:
         return await CrawlingProcess(self.target, self.count).process_daum()
 
+    async def google_again(self) -> UrlCollect:
+        return await CrawlingProcess(self.target, self.count).process_google()
+
     # fmt: off
     def execute(self, context) -> list[list[str]]:
         loop = asyncio.get_event_loop()
@@ -28,6 +31,8 @@ class CrawlingOperator(BaseOperator):
             result = loop.run_until_complete(self.naver_again())
         elif self.site == "daum":
             result = loop.run_until_complete(self.daum_again())
+        elif self.site == "google":
+            result = loop.run_until_complete(self.google_again())
         else:
             raise ValueError("Invalid site specified")
 

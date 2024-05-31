@@ -81,15 +81,15 @@ def chrome_option_injection() -> webdriver.Chrome:
     }
 
     option_chrome.add_experimental_option("prefs", prefs)
-    # webdriver_remote = webdriver.Remote(
-    #     "http://0.0.0.0:4444/wd/hub", options=option_chrome
-    # )
-    from webdriver_manager.chrome import ChromeDriverManager
-    from selenium.webdriver.chrome.service import Service as ChromeService
-
-    webdriver_remote = webdriver.Chrome(
-        service=ChromeService(ChromeDriverManager().install()), options=option_chrome
+    webdriver_remote = webdriver.Remote(
+        "http://chrome:4444/wd/hub", options=option_chrome
     )
+    # from webdriver_manager.chrome import ChromeDriverManager
+    # from selenium.webdriver.chrome.service import Service as ChromeService
+
+    # webdriver_remote = webdriver.Chrome(
+    #     service=ChromeService(ChromeDriverManager().install()), options=option_chrome
+    # )
     return webdriver_remote
 
 
@@ -149,9 +149,12 @@ class GoogleMovingElementsLocation(GoogleNewsCrawlingParsingDrive):
             else:
                 print("google 수집 종료")
                 self.driver.quit()
-        except (NoSuchElementException, WebDriverException) as e:
-            print(f"해당 이유로 인해 수집을 다시 시도합니다 --> {e}")
+        except NoSuchElementException as e:
+            print(f"요소를 찾을 수 없어 수집을 다시 시도합니다 --> {e}")
             self.driver.refresh()
+        except WebDriverException as e:
+            print(f"드라이버 이슈로 인해 수집을 중단합니다 --> {e}")
+            self.driver.quit()
         return data
 
     def next_page_moving(self) -> UrlCollect:
