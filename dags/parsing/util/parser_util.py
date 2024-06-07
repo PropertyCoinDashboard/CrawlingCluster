@@ -3,6 +3,7 @@
 """
 
 import re
+import datetime
 from typing import Any
 from pathlib import Path
 from urllib.parse import urlparse
@@ -64,6 +65,15 @@ def href_from_text_preprocessing(text: str) -> str:
             - ex) 어쩌구 저쩌구
     """
     return re.sub(r"\b\d+시간 전\b|\.{2,}|[^\w\s]", "", text)
+
+
+def time_extract(format: str) -> str:
+    # 날짜와 시간 문자열을 datetime 객체로 변환
+    date_obj = datetime.datetime.strptime(format, "%a, %d %b %Y %H:%M:%S %z")
+
+    # 원하는 형식으로 변환
+    formatted_date = date_obj.strftime("%Y-%m-%d")
+    return formatted_date
 
 
 def href_from_a_tag(a_tag: BeautifulSoup, element: str = "href") -> str:

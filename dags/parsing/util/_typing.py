@@ -1,5 +1,7 @@
 from typing import TypedDict, Deque, Callable
 
+UrlDictCollect = Deque[dict[list[str, str, str]]]
+
 UrlCollect = Deque[list[str]]
 ProcessUrlCollect = Callable[[str, int], UrlCollect]
 
