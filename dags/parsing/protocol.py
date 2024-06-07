@@ -1,9 +1,7 @@
 from parsing.config.properties import D_HEADERS
 from parsing.util._typing import UrlCollect
-from parsing.drive.nd_paring_driver import (
-    DaumNewsParsingDriver,
+from parsing.drive.naver_parsing_api import (
     NaverNewsParsingDriver,
-    GoogleNewsParsingDriver,
 )
 from parsing.drive.selenium_parsing import (
     GoogleMovingElementsLocation,
@@ -32,14 +30,6 @@ class CrawlingProcess:
         """google 크롤링"""
         return GoogleMovingElementsLocation(self.target, self.count).search_box()
 
-    # fmt: off
-    # async def process_daum(self) -> UrlCollect:
-    #     """daum 크롤링"""
-    #     return await DaumNewsParsingDriver(self.target, self.count, D_HEADERS).extract_news_urls()
-
     async def process_naver(self) -> UrlCollect:
         """naver 크롤링"""
         return await NaverNewsParsingDriver(self.target, self.count).extract_news_urls()
-
-    async def process_google(self) -> UrlCollect:
-        return await GoogleNewsParsingDriver(self.target, self.count).extract_news_urls()

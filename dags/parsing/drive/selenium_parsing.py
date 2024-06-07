@@ -1,3 +1,4 @@
+import time
 import random
 import urllib3
 
@@ -23,6 +24,7 @@ from fake_useragent import UserAgent
 from parsing.drive.gb_parsing_drive import (
     GoogleNewsCrawlingParsingDrive,
     BingNewsCrawlingParsingDrive,
+    DaumNewsCrawlingParsingDrive,
 )
 from parsing.util._typing import UrlCollect
 from parsing.config._xpath_location import (
@@ -39,58 +41,132 @@ ua = UserAgent()
 def chrome_option_injection() -> webdriver.Chrome:
     # 크롬 옵션 설정
     option_chrome = uc.ChromeOptions()
-    option_chrome.add_argument("headless")
-    option_chrome.add_argument("--disable-gpu")
-    option_chrome.add_argument("--disable-infobars")
-    option_chrome.add_argument("--disable-extensions")
-    option_chrome.add_argument("--no-sandbox")
-    option_chrome.add_argument("--disable-dev-shm-usage")
+    # option_chrome.add_argument("headless")
+    # option_chrome.add_argument("--disable-gpu")
+    # option_chrome.add_argument("--disable-infobars")
+    # option_chrome.add_argument("--disable-extensions")
+    # option_chrome.add_argument("--no-sandbox")
+    # option_chrome.add_argument("--disable-dev-shm-usage")
     option_chrome.add_argument(f"user-agent={ua.random}")
 
-    caps = DesiredCapabilities().CHROME
-    # page loading 없애기
-    caps["pageLoadStrategy"] = "none"
+    # caps = DesiredCapabilities().CHROME
+    # # page loading 없애기
+    # caps["pageLoadStrategy"] = "none"
 
-    prefs = {
-        "profile.default_content_setting_values": {
-            "cookies": 2,
-            "images": 2,
-            "plugins": 2,
-            "popups": 2,
-            "geolocation": 2,
-            "notifications": 2,
-            "auto_select_certificate": 2,
-            "fullscreen": 2,
-            "mouselock": 2,
-            "mixed_script": 2,
-            "media_stream": 2,
-            "media_stream_mic": 2,
-            "media_stream_camera": 2,
-            "protocol_handlers": 2,
-            "ppapi_broker": 2,
-            "automatic_downloads": 2,
-            "midi_sysex": 2,
-            "push_messaging": 2,
-            "ssl_cert_decisions": 2,
-            "metro_switch_to_desktop": 2,
-            "protected_media_identifier": 2,
-            "app_banner": 2,
-            "site_engagement": 2,
-            "durable_storage": 2,
-        }
-    }
+    # prefs = {
+    #     "profile.default_content_setting_values": {
+    #         "cookies": 2,
+    #         "images": 2,
+    #         "plugins": 2,
+    #         "popups": 2,
+    #         "geolocation": 2,
+    #         "notifications": 2,
+    #         "auto_select_certificate": 2,
+    #         "fullscreen": 2,
+    #         "mouselock": 2,
+    #         "mixed_script": 2,
+    #         "media_stream": 2,
+    #         "media_stream_mic": 2,
+    #         "media_stream_camera": 2,
+    #         "protocol_handlers": 2,
+    #         "ppapi_broker": 2,
+    #         "automatic_downloads": 2,
+    #         "midi_sysex": 2,
+    #         "push_messaging": 2,
+    #         "ssl_cert_decisions": 2,
+    #         "metro_switch_to_desktop": 2,
+    #         "protected_media_identifier": 2,
+    #         "app_banner": 2,
+    #         "site_engagement": 2,
+    #         "durable_storage": 2,
+    #     }
+    # }
 
-    option_chrome.add_experimental_option("prefs", prefs)
-    webdriver_remote = webdriver.Remote(
-        "http://chrome:4444/wd/hub", options=option_chrome
-    )
-    # from webdriver_manager.chrome import ChromeDriverManager
-    # from selenium.webdriver.chrome.service import Service as ChromeService
-
-    # webdriver_remote = webdriver.Chrome(
-    #     service=ChromeService(ChromeDriverManager().install()), options=option_chrome
+    # option_chrome.add_experimental_option("prefs", prefs)
+    # webdriver_remote = webdriver.Remote(
+    #     "http://chrome:4444/wd/hub", options=option_chrome
     # )
+    from webdriver_manager.chrome import ChromeDriverManager
+    from selenium.webdriver.chrome.service import Service as ChromeService
+
+    webdriver_remote = webdriver.Chrome(
+        service=ChromeService(ChromeDriverManager().install()), options=option_chrome
+    )
     return webdriver_remote
+
+
+def page_scroll_moving(
+    driver: webdriver.Chrome, scroll1: int, scroll2: int = SCROLL_ITERATIONS
+) -> None:
+    """
+    google 스크롤 계산 내리기 5번에 걸쳐서 내리기
+    """
+
+    def time_step_scroll(scroll_cal, scroll):
+        for i in range(int(scroll)):
+            driver.execute_script(f"window.scrollTo(0, {i * scroll_cal})")
+            time.sleep(1)
+
+    def not_step_scroll(scroll_cal, scroll):
+        for i in range(int(scroll)):
+            driver.execute_script(f"window.scrollTo(0, {i * scroll_cal})")
+
+    prev_height = driver.execute_script("return document.body.scrollHeight")
+
+    select_int = [scroll1, scroll2]
+    selected_scroll = random.choice(select_int)
+
+    scroll_cal = prev_height / selected_scroll
+
+    # 두 함수를 리스트에 넣고 랜덤으로 선택하여 실행
+    scroll_functions = [time_step_scroll, not_step_scroll]
+    selected_function = random.choice(scroll_functions)
+    selected_function(scroll_cal, selected_scroll)
+
+
+class DaumMovingElementsLocation(DaumNewsCrawlingParsingDrive):
+    def __init__(self, target: str, count: int) -> None:
+        """
+        Args:
+            target (str): 검색 타겟
+            count (int): 얼마나 수집할껀지
+        """
+        self.url = f"https://search.daum.net/search?w=news&nil_search=btn&DA=NTB&enc=utf8&cluster=y&cluster_page=1&q={target}"
+        self.driver: webdriver.Chrome = chrome_option_injection()
+        self.count = count
+
+    def next_page_moving(self, xpath: str) -> Any:
+        news_box_type: Any = WebDriverWait(self.driver, WAIT_TIME).until(
+            EC.presence_of_element_located((By.XPATH, xpath))
+        )
+        return news_box_type
+
+    def page_injection(self):
+        """
+        //*[@id="dnsColl"]/div[2]/div/div/a[1] 2
+        //*[@id="dnsColl"]/div[2]/div/div/a[2] 3
+        //*[@id="dnsColl"]/div[2]/div/div/a[3] 4
+        //*[@id="dnsColl"]/div[2]/div/div/a[4] 5
+        """
+        self.driver.get(self.url)
+        for i in range(1, 3):
+            page_scroll_moving(self.driver, int(random.uniform(500, 1000)))
+            self.driver.implicitly_wait(random.uniform(5.0, 10.0))
+            time.sleep(1)
+            next_page_button = self.next_page_moving(
+                f'//*[@id="dnsColl"]/div[2]/div/div/a[{i}]'
+            )
+            next_page_button.click()
+
+        while self.count:
+            self.driver.implicitly_wait(random.uniform(5.0, 10.0))
+            page_scroll_moving(self.driver, int(random.uniform(500, 1000)))
+            time.sleep(1)
+            next_page_button = self.next_page_moving(
+                f'//*[@id="dnsColl"]/div[2]/div/div/a[{3}]'
+            )
+            next_page_button.click()
+            self.count -= 1
 
 
 class GoogleMovingElementsLocation(GoogleNewsCrawlingParsingDrive):
@@ -109,18 +185,6 @@ class GoogleMovingElementsLocation(GoogleNewsCrawlingParsingDrive):
         self.url = f"https://www.google.com/search?q={target}&tbm=nws&gl=ko&hl=kr"
         self.driver: webdriver.Chrome = chrome_option_injection()
         self.count = count
-
-    def page_scroll_moving(self) -> None:
-        """
-        google 스크롤 계산 내리기 5번에 걸쳐서 내리기
-        """
-        prev_height: int = self.driver.execute_script(
-            "return document.body.scrollHeight"
-        )
-        for i in range(1, SCROLL_ITERATIONS):
-            self.driver.implicitly_wait(random.uniform(5.0, 10.0))
-            scroll_cal: float = prev_height / SCROLL_ITERATIONS * i
-            self.driver.execute_script(f"window.scrollTo(0, {scroll_cal})")
 
     def search_box_page_type(self, xpath: str) -> Any:
         """xpath 요소 찾기"""
@@ -145,7 +209,7 @@ class GoogleMovingElementsLocation(GoogleNewsCrawlingParsingDrive):
                 data.append(url_data)
                 next_page_button.click()
                 self.driver.implicitly_wait(random.uniform(5.0, 10.0))
-                self.page_scroll_moving()
+                page_scroll_moving(self.driver)
             else:
                 print("google 수집 종료")
                 self.driver.quit()
@@ -189,7 +253,7 @@ class GoogleMovingElementsLocation(GoogleNewsCrawlingParsingDrive):
             - 다음 page 이동
         """
         self.driver.get(self.url)
-        self.page_scroll_moving()
+        page_scroll_moving(self.driver)
         return self.next_page_moving()
 
 

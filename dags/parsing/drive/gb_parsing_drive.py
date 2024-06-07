@@ -7,6 +7,10 @@ from bs4 import BeautifulSoup
 from parsing.util.parser_util import soup_data, href_from_a_tag
 
 
+class DaumNewsCrawlingParsingDrive:
+    pass
+
+
 class GoogleNewsCrawlingParsingDrive:
     """
     Google News Parsing Drive
