@@ -33,9 +33,9 @@ class CrawlingProcess:
         return GoogleMovingElementsLocation(self.target, self.count).search_box()
 
     # fmt: off
-    async def process_daum(self) -> UrlCollect:
-        """daum 크롤링"""
-        return await DaumNewsParsingDriver(self.target, self.count, D_HEADERS).extract_news_urls()
+    # async def process_daum(self) -> UrlCollect:
+    #     """daum 크롤링"""
+    #     return await DaumNewsParsingDriver(self.target, self.count, D_HEADERS).extract_news_urls()
 
     async def process_naver(self) -> UrlCollect:
         """naver 크롤링"""
