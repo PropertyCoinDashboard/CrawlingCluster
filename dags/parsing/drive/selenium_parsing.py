@@ -121,6 +121,7 @@ def page_scroll_moving(
     # 두 함수를 리스트에 넣고 랜덤으로 선택하여 실행
     scroll_functions = [time_step_scroll, not_step_scroll]
     selected_function = random.choice(scroll_functions)
+
     selected_function(scroll_cal, selected_scroll)
 
 
