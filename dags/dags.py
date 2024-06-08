@@ -85,4 +85,4 @@
 
 from parsing.drive.selenium_parsing import DaumMovingElementsLocation
 
-DaumMovingElementsLocation("BTC", 5).page_injection()
+print(DaumMovingElementsLocation("BTC", 1).page_injection())

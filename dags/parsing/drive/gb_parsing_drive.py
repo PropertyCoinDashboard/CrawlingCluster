@@ -8,7 +8,68 @@ from parsing.util.parser_util import soup_data, href_from_a_tag
 
 
 class DaumNewsCrawlingParsingDrive:
-    pass
+    def ul_in_class(self, element: BeautifulSoup) -> list[str]:
+        return element.find_all("ul", {"class": "c-list-basic"})
+
+    def li_in_data_docid(self, element: BeautifulSoup) -> list[str]:
+        match = re.compile(r"^26.*")
+        return element.find_all("li", {"data-docid": match})
+
+    def strong_in_class(self, element: BeautifulSoup) -> list[str]:
+        return element.find_all("strong", {"class": "tit-g clamp-g"})
+
+    def spen_in_class(self, element: BeautifulSoup) -> list[str]:
+        return element.find_all("span", {"class": "gem-subinfo"})
+
+    def news_info_collect(self, html_source: str) -> list[dict[str, str]]:
+        """요소 추출 시작점
+
+        Args:
+            html_source (str): HTML
+        """
+        # 첫번쨰 요소 접근  -> <div data-hveid="CA~QHw">
+        # 요소별 무작위 난수이므로 정규표현식 사용
+        div_in_data_hveid: list = soup_data(
+            html_data=html_source,
+            element="ul",
+            elements={"class": "c-list-basic"},
+            soup=BeautifulSoup(html_source, "lxml"),
+        )
+
+        li_in_data_docid_cache: list[list[str]] = [
+            self.li_in_data_docid(div_1) for div_1 in div_in_data_hveid
+        ]
+
+        data_list = []
+        for div_2_list in li_in_data_docid_cache:
+            for div_2 in div_2_list:
+                # 강조 태그와 spen 태그를 한 번에 가져오기
+                strong_tags = self.strong_in_class(div_2)
+                spen_tags = self.spen_in_class(div_2)
+                # 링크, 날짜, 텍스트를 동시에 추출
+                for strong_tag, spen_tag in zip(strong_tags, spen_tags):
+                    links = (
+                        href_from_a_tag(a_tag) for a_tag in strong_tag.find_all("a")
+                    )
+
+                    texts = (
+                        a_tag.text.replace(" ", "").strip()
+                        for a_tag in strong_tag.find_all("a")
+                    )
+
+                    dates = (
+                        spen_tags.text
+                        for spen_tags in spen_tag.find_all(
+                            "span", {"class": "txt_info"}
+                        )
+                    )
+                    # 링크, 날짜, 텍스트를 결합하여 딕셔너리로 만들고 data_list에 추가
+                    data_list.extend(
+                        {"url": link, "date": date, "title": text}
+                        for link, date, text in zip(links, dates, texts)
+                    )
+
+        return data_list
 
 
 class GoogleNewsCrawlingParsingDrive:
