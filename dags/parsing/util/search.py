@@ -1,8 +1,11 @@
 import time
+from queue import Queue
+from collections import deque
+from threading import Thread, Lock
+
+import aiohttp
 import requests
 from bs4 import BeautifulSoup
-import aiohttp
-from collections import deque
 from parsing.util.data_structure import indstrict
 from parsing.util.parser_util import url_addition
 from parsing.util._typing import (
@@ -188,3 +191,61 @@ class AsyncRequestAcquisitionHTML:
                     return self.url
                 case _:
                     return {self.url: response.status}
+
+
+# 임시 병렬 크롤링
+class WebCrawler:
+    def __init__(self, start_url: str, max_pages: int) -> None:
+        self.start_url = start_url
+        self.max_pages = max_pages
+        self.visited_urls = set()
+        self.lock = Lock()
+        self.url_queue = Queue()  # Using a Queue
+        self.url_queue.put(start_url)
+        self.results: list[str] = []
+
+    def fetch_content(self, url: str) -> str | None:
+        try:
+            response = requests.get(url, timeout=5)
+            if response.status_code == 200:
+                return response.text
+            return None
+        except requests.RequestException:
+            return None
+
+    def parse_links(self, content: str) -> set[str]:
+        soup = BeautifulSoup(content, "html.parser")
+        links = set()
+        for a_tag in soup.find_all("a", href=True):
+            link = a_tag["href"]
+            if link.startswith("/"):
+                link = url_addition(link)
+            if link.startswith("http"):
+                links.add(link)
+        return links
+
+    def crawl(self) -> None:
+        while not self.url_queue.empty() and len(self.visited_urls) < self.max_pages:
+            current_url: str = self.url_queue.get()  # Get URL from the queue
+
+            with self.lock:
+                if current_url in self.visited_urls:
+                    continue
+                self.visited_urls.add(current_url)
+
+            content: str = self.fetch_content(current_url)
+            if content:
+                self.results.append((current_url, content))
+
+                for link in self.parse_links(content, current_url):
+                    if link not in self.visited_urls:
+                        self.url_queue.put(link)  # Add new URLs to the queue
+
+    def run(self, num_threads: int = 4) -> list[str]:
+        threads = [Thread(target=self.crawl) for _ in range(num_threads)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        return self.results

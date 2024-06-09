@@ -2,14 +2,11 @@ from abc import ABC, abstractmethod
 
 import configparser
 from pathlib import Path
-import time
-import asyncio
 from collections import deque
 
-from bs4 import BeautifulSoup
 
-from parsing.util._typing import UrlCollect, UrlDictCollect
-from parsing.util.parser_util import soup_data, href_from_a_tag, time_extract
+from parsing.util._typing import UrlDictCollect
+from parsing.util.parser_util import time_extract
 from parsing.util.search import AsyncRequestAcquisitionHTML as ARAH
 
 
@@ -56,7 +53,9 @@ class NaverNewsParsingDriver(AbstractAsyncNewsParsingDriver):
             "X-Naver-Client-Id": naver_id,
             "X-Naver-Client-Secret": naver_secret,
         }
-        self.url = f"{naver_url}/news.json?query={self.target}&start={self.count}&display=100sort=date"
+        self.url = (
+            f"{naver_url}/news.json?query={self.target}&start={self.count}&display=100"
+        )
 
     async def fetch_page_urls(self, url: str, headers: dict[str, str]) -> dict:
         """JSON 비동기 호출

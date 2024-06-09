@@ -82,7 +82,3 @@
 
 #     google_task >> saving
 #     google_task >> check_xcom_task >> google_2nd_task >> saving
-
-from parsing.drive.selenium_parsing import DaumMovingElementsLocation
-
-print(DaumMovingElementsLocation("BTC", 1).page_injection())

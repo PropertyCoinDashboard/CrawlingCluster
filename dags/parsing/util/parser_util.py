@@ -72,7 +72,7 @@ def time_extract(format: str) -> str:
     date_obj = datetime.datetime.strptime(format, "%a, %d %b %Y %H:%M:%S %z")
 
     # 원하는 형식으로 변환
-    formatted_date = date_obj.strftime("%Y-%m-%d")
+    formatted_date = date_obj.strftime("%Y-%m-%d: %H:%M:%S")
     return formatted_date
 
 
