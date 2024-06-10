@@ -40,7 +40,7 @@ class NaverNewsParsingDriver:
             f"{naver_url}/news.json?query={self.target}&start={self.count}&display=100"
         )
 
-    async def fetch_page_urls(self, url: str, headers: dict[str, str]) -> dict:
+    async def fetch_page_urls(self) -> dict:
         """JSON 비동기 호출
         Args:
             url (str): URL
@@ -48,12 +48,15 @@ class NaverNewsParsingDriver:
         Returns:
             dict: JSON
         """
-        urls = await ARAH.async_html(
-            type_="json",
-            url=url,
-            headers=headers,
-        )
-        return urls
+        try:
+            urls = await ARAH.async_html(
+                type_="json",
+                url=self.url,
+                headers=self.header,
+            )
+            return (urls, True)
+        except ConnectionError:
+            return False
 
     async def extract_news_urls(self) -> UrlDictCollect:
         """new parsing
@@ -64,7 +67,7 @@ class NaverNewsParsingDriver:
             UrlCollect: [URL, ~]
         """
         print("Naver 시작합니다")
-        res_data: dict = await self.fetch_page_urls(url=self.url, headers=self.header)
+        res_data: dict = await self.fetch_page_urls()
         data: list[dict[str]] = list(
             map(
                 lambda item: {
@@ -72,7 +75,7 @@ class NaverNewsParsingDriver:
                     "link": item["originallink"],
                     "date": time_extract(item["pubDate"]),
                 },
-                res_data["items"],
+                res_data[0]["items"],
             )
         )
         urls = deque(data)

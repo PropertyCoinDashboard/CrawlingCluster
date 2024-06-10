@@ -1,120 +1,96 @@
-# import asyncio
-# from typing import Any
-
-# from airflow import DAG
-# from airflow.utils.dates import days_ago
-# from airflow.utils.trigger_rule import TriggerRule
-# from airflow.operators.python import PythonOperator, BranchPythonOperator
-# from airflow.operators.bash import BashOperator
-
-
-# with DAG(
-#     dag_id="Crawling_data_API", start_date=days_ago(5), schedule_interval=None
-# ) as dag:
-#     from parsing.hooks.db.hook import first_data_saving
-#     from parsing.asnyc_protocol import aiorequest_injection
-#     from parsing.operators.crawling import CrawlingOperator
-#     from parsing.operators.selenium_operators import SeleniumOperator
-
-#     def status_200_injection(**context: dict[str, Any]) -> None:
-#         data = context["ti"].xcom_pull(task_ids=context["task"].upstream_task_ids)
-#         loop = asyncio.get_event_loop()
-#         for i in data:
-#             loop.run_until_complete(aiorequest_injection(i, 20))
-
-#     def check_xcom_data(**context):
-#         ti = context["ti"]
-#         google_task_output = ti.xcom_pull(task_ids="crawl_google")
-#         if isinstance(google_task_output, list) and not google_task_output:
-#             return "google_2nd_task"
-
-#     start_operator = BashOperator(
-#         task_id="News_API_start", bash_command="echo crawling start!!", dag=dag
-#     )
-
-#     crawl_tasks = []
-#     for site in ["naver", "daum"]:
-#         crawl_task = CrawlingOperator(
-#             task_id=f"crawl_{site}",
-#             count=10,
-#             target="BTC",
-#             site=site,
-#             dag=dag,
-#         )
-#         start_operator >> crawl_task
-#         crawl_tasks.append(crawl_task)
-
-#     google_task = CrawlingOperator(
-#         task_id="crawl_google",
-#         count=10,
-#         target="BTC",
-#         site="google",
-#         dag=dag,
-#     )
-
-#     check_xcom_task = BranchPythonOperator(
-#         task_id="check_xcom_task",
-#         python_callable=check_xcom_data,
-#         provide_context=True,
-#         dag=dag,
-#     )
-
-#     google_2nd_task = SeleniumOperator(
-#         task_id="google_2nd_task",
-#         count=10,
-#         target="BTC",
-#         site="google_s",
-#         dag=dag,
-#     )
-
-#     saving = PythonOperator(
-#         task_id="total_data_saving",
-#         python_callable=first_data_saving,
-#         provide_context=True,
-#         trigger_rule=TriggerRule.ALL_DONE,
-#         dag=dag,
-#     )
-
-#     start_operator >> crawl_tasks
-#     start_operator >> google_task
-#     for crawl_task in crawl_tasks:
-#         crawl_task >> saving
-
-#     google_task >> saving
-#     google_task >> check_xcom_task >> google_2nd_task >> saving
 import asyncio
-import tracemalloc
-from typing import Coroutine
-from parsing.util.search import AsyncWebCrawler, AsyncRequestAcquisitionHTML as ARAH
+from datetime import datetime, timedelta
+
+from airflow import DAG
+from airflow.operators.python import PythonOperator
+from airflow.sensors.external_task import ExternalTaskSensor
+from airflow.operators.bash import BashOperator
+
 from parsing.drive.naver_parsing_api import NaverNewsParsingDriver
-
-tracemalloc.start()
-
-
-async def url_classifier(result) -> None:
-    """객체에서 받아온 URL 큐 분류"""
-    if isinstance(result, str):
-        not_ready_status(result)
-    elif isinstance(result, dict):
-        print(result)
+from parsing.operators.crawling import CrawlingOperator
+from parsing.hooks.db.hook import first_data_saving, aiorequest_injection
 
 
-async def aiorequest_injection(start: list[str]) -> None:
-    """starting queue에 담기 위한 시작
+def response_html() -> dict[str, bool]:
+    data = NaverNewsParsingDriver("BTC", 10).fetch_page_urls()
+    loop = asyncio.get_event_loop()
+    play = loop.run_until_complete(data)
 
-    Args:
-        start (UrlCollect): 큐
-        batch_size (int): 묶어서 처리할 량
-    """
-    while start:
-        node: list[str] = start.pop()["link"]
-        tasks: list[Coroutine[str | dict[str, int]]] = await ARAH.asnyc_request(node)
-        await url_classifier(tasks)
+    if play[1] == True:
+        return {"check_fn": True}
+    else:
+        return {"check_fn": False}
 
 
-def not_ready_status(url):
-    a = asyncio.create_task(AsyncWebCrawler(url, 2, 1).run())
+def sync_aiorequest_injection(**context) -> list[dict[str]]:
+    loop = asyncio.get_event_loop()
+    if loop.is_running():
+        # 이미 이벤트 루프가 실행 중인 경우
+        result = loop.run_until_complete(aiorequest_injection(**context))
+    else:
+        # 새로운 이벤트 루프를 시작
+        result = asyncio.run(aiorequest_injection(**context))
+    return result
 
 
-a = asyncio.run(NaverNewsParsingDriver("BTC", 1).extract_news_urls())
-asyncio.run(aiorequest_injection(a))
+default_args = {
+    "owner": "airflow",
+    "depends_on_past": False,
+    "start_date": datetime(2024, 6, 10),
+    "email": ["limhaneul12@naver.com"],
+    "email_on_failure": True,
+    "email_on_retry": False,
+    "retries": 1,
+    "retry_delay": timedelta(minutes=10),
+}
+
+
+with DAG(
+    dag_id="Crawling_data_API",
+    default_args=default_args,
+    schedule_interval=timedelta(minutes=5),
+    catchup=False,
+    tags=["네이버 크롤링"],
+) as dag:
+
+    response = PythonOperator(
+        task_id="api_call_task",
+        python_callable=response_html,
+        provide_context=True,
+    )
+
+    wait_for_api_response = ExternalTaskSensor(
+        task_id="wait_for_api_response",
+        external_dag_id="Crawling_data_API",
+        external_task_id=response.task_id,
+        mode="reschedule",
+        poke_interval=60,
+        timeout=600,
+        retries=3,
+    )
+
+    start_operator = BashOperator(
+        task_id="News_API_start", bash_command="echo crawling start!!"
+    )
+
+    naver = CrawlingOperator(
+        task_id="naver_task",
+        count=10,
+        target="BTC",
+        site="naver",
+    )
+
+    status_requesting = PythonOperator(
+        task_id="classifier",
+        python_callable=sync_aiorequest_injection,
+        provide_context=True,
+        dag=dag,
+    )
+
+    saving = PythonOperator(
+        task_id="saving", python_callable=first_data_saving, dag=dag
+    )
+
+    response >> wait_for_api_response >> start_operator >> naver
+    naver >> saving
+    naver >> status_requesting

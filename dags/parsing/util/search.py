@@ -3,6 +3,7 @@ from collections import deque
 
 
 import aiohttp
+from aiohttp.client_exceptions import ClientConnectorError
 from bs4 import BeautifulSoup
 from parsing.util.data_structure import indstrict
 from parsing.util.parser_util import url_addition
@@ -94,7 +95,7 @@ class AsyncRequestAcquisitionHTML:
         self.session = session
 
     @staticmethod
-    async def asnyc_request(url: str) -> str:
+    async def asnyc_request(url: str) -> str | dict[str, int]:
         """request 요청 200 분류
 
         Args:
@@ -127,9 +128,12 @@ class AsyncRequestAcquisitionHTML:
             _type_: 각 형태에 맞춰서 리턴 HTML(str) or JSON
         """
         async with aiohttp.ClientSession() as session:
-            return await AsyncRequestAcquisitionHTML(
-                session, url, params, headers
-            ).async_source(type_)
+            try:
+                return await AsyncRequestAcquisitionHTML(
+                    session, url, params, headers
+                ).async_source(type_)
+            except ClientConnectorError:
+                return None
 
     async def async_source(self, type_: str) -> str | dict:
         """위에 쓰고 있는 함수 본체"""
@@ -151,7 +155,7 @@ class AsyncRequestAcquisitionHTML:
                 case 200:
                     return self.url
                 case _:
-                    return {self.url: response.status}
+                    return {"status": response.status}
 
 
 class AsyncWebCrawler:
@@ -162,7 +166,7 @@ class AsyncWebCrawler:
         self.visited_urls = set()
         self.url_queue = asyncio.Queue()
         self.url_queue.put_nowait((start_url, 0))  # Put start URL with depth 0
-        self.results = []
+        self.results = {}
 
     def parse_links(self, content: str, base_url: str) -> set[str]:
         soup = BeautifulSoup(content, "lxml")
@@ -183,23 +187,17 @@ class AsyncWebCrawler:
                 continue
 
             self.visited_urls.add(current_url)
+            content = await AsyncRequestAcquisitionHTML.async_html("html", current_url)
 
-            content = await AsyncRequestAcquisitionHTML.async_html(
-                "html", url=current_url
-            )
             if content:
-                self.results.append((current_url, content))
-
                 if depth < self.max_depth:
-                    new_links = self.parse_links(content, self.start_url)
+                    new_links = self.parse_links(content, current_url)
+                    self.results[current_url] = new_links
                     for link in new_links:
-                        if (
-                            link not in self.visited_urls
-                            and len(self.visited_urls) < self.max_pages
-                        ):
+                        if link not in self.visited_urls:
                             await self.url_queue.put((link, depth + 1))
 
-    async def run(self, num_tasks: int = 4) -> list[str]:
+    async def run(self, num_tasks: int = 4) -> dict[str, set[str]]:
         tasks = [asyncio.create_task(self.crawl()) for _ in range(num_tasks)]
         await asyncio.gather(*tasks)
         return self.results
