@@ -6,7 +6,7 @@ import re
 import datetime
 from typing import Any
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urljoin
 
 
 import pandas as pd
@@ -30,27 +30,32 @@ def csv_saving(data: list, csv_file_name: str) -> pd.DataFrame:
 
 
 def url_create(url: str) -> str:
-    """url 합성
+    """URL 합성
     Args:
         url (str): url
 
     Returns:
-        str: 완품 url
+        str: 완품 URL
             - ex) naver.com -> https://www.naver.com
     """
-    return f"{urlparse(url).scheme}://{urlparse(url).netloc}/"
+    parsed_url = urlparse(url)
+    if not parsed_url.scheme:
+        return f"https://{parsed_url.netloc or url}/"
+    return f"{parsed_url.scheme}://{parsed_url.netloc}/"
 
 
-def url_addition(url: str) -> str:
-    """/~ 로 끝나는 url 붙여주는 함수
+def url_addition(base_url: str, url: str) -> str:
+    """/~ 로 끝나는 URL을 붙여주는 함수
     Args:
-        url (str): url
+        base_url (str): 기준 URL
+        url (str): 추가할 URL
 
     Returns:
-        str: url
+        str: 합쳐진 URL
     """
-    link = url_create(url) + url if url.startswith("/") else url
-    return link
+    if url.startswith("/"):
+        return urljoin(url_create(base_url), url)
+    return url
 
 
 def href_from_text_preprocessing(text: str) -> str:

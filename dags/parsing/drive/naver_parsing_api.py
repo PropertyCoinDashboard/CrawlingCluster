@@ -21,27 +21,10 @@ naver_secret: str = parser.get("naver", "X-Naver-Client-Secret")
 naver_url: str = parser.get("naver", "NAVER_URL")
 
 
-class AbstractAsyncNewsParsingDriver(ABC):
-    """비동기 API 호출 추상화"""
-
-    def __init__(self, target: str, count: int) -> None:
-        self.target = target
-        self.count = count
-
-    @abstractmethod
-    async def fetch_page_urls(self, url: str) -> str:
-        raise NotImplementedError()
-
-    @abstractmethod
-    async def extract_news_urls(self) -> deque:
-        raise NotImplementedError()
-
-
-class NaverNewsParsingDriver(AbstractAsyncNewsParsingDriver):
+class NaverNewsParsingDriver:
     """네이버 비동기 API 호출"""
 
     def __init__(self, target: str, count: int) -> None:
-        super().__init__(target, count)
         """
         Args:
             target (str): 긁어올 타겟
@@ -82,7 +65,7 @@ class NaverNewsParsingDriver(AbstractAsyncNewsParsingDriver):
         """
         print("Naver 시작합니다")
         res_data: dict = await self.fetch_page_urls(url=self.url, headers=self.header)
-        data: list[dict[str, str, str]] = list(
+        data: list[dict[str]] = list(
             map(
                 lambda item: {
                     "title": item["title"],

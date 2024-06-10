@@ -82,3 +82,39 @@
 
 #     google_task >> saving
 #     google_task >> check_xcom_task >> google_2nd_task >> saving
+import asyncio
+import tracemalloc
+from typing import Coroutine
+from parsing.util.search import AsyncWebCrawler, AsyncRequestAcquisitionHTML as ARAH
+from parsing.drive.naver_parsing_api import NaverNewsParsingDriver
+
+tracemalloc.start()
+
+
+async def url_classifier(result) -> None:
+    """객체에서 받아온 URL 큐 분류"""
+    if isinstance(result, str):
+        not_ready_status(result)
+    elif isinstance(result, dict):
+        print(result)
+
+
+async def aiorequest_injection(start: list[str]) -> None:
+    """starting queue에 담기 위한 시작
+
+    Args:
+        start (UrlCollect): 큐
+        batch_size (int): 묶어서 처리할 량
+    """
+    while start:
+        node: list[str] = start.pop()["link"]
+        tasks: list[Coroutine[str | dict[str, int]]] = await ARAH.asnyc_request(node)
+        await url_classifier(tasks)
+
+
+def not_ready_status(url):
+    a = asyncio.create_task(AsyncWebCrawler(url, 2, 1).run())
+
+
+a = asyncio.run(NaverNewsParsingDriver("BTC", 1).extract_news_urls())
+asyncio.run(aiorequest_injection(a))

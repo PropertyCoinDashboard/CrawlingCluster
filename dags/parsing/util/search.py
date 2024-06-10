@@ -1,17 +1,15 @@
-import time
-from queue import Queue
+import asyncio
 from collections import deque
-from threading import Thread, Lock
+
 
 import aiohttp
-import requests
 from bs4 import BeautifulSoup
 from parsing.util.data_structure import indstrict
 from parsing.util.parser_util import url_addition
 from parsing.util._typing import (
     UrlDataStructure,
-    ProcessUrlCollect,
     OuterData,
+    ProcessUrlCollect,
     UrlCollect,
 )
 
@@ -29,43 +27,6 @@ def recursive_dfs(
             recursive_dfs(n, graph, discovered)
 
     return discovered
-
-
-def bfs_crawl(start_url: str, max_depth=2):
-    visited = set()
-    queue = deque([(start_url, 0)])
-
-    while queue:
-        url, depth = queue.popleft()
-        if depth > max_depth:
-            break
-
-        if url in visited:
-            continue
-
-        visited.add(url)
-        print(f"Depth: {depth}, URL: {url}")
-
-        try:
-            response = requests.get(url)
-            if response.status_code != 200:
-                continue
-
-            soup = BeautifulSoup(response.text, "html.parser")
-
-            links = [a["href"] for a in soup.find_all("a", href=True)]
-            time.sleep(2)
-            for link in links:
-                if link.startswith("/"):
-                    link = url_addition(start_url)
-                elif not link.startswith("http" or "https"):
-                    continue  # 다른 프로토콜이나 상대 경로가 아닌 링크는 무시
-
-                if link not in visited:
-                    queue.append((link, depth + 1))
-
-        except Exception as e:
-            print(f"URL 변환 X {url}: {e}")
 
 
 # BFS 함수 정의
@@ -93,7 +54,7 @@ def deep_dive_search(page: ProcessUrlCollect, objection: str) -> UrlCollect:
         objection (str): 어떤 페이지에 할것인지
 
     Returns:
-        UrlCollect: deque([URL 뭉치들]) [startingßå]
+        UrlCollect: deque([URL 뭉치들]) [starting]
     """
     starting_queue = deque()
     tree: UrlDataStructure = indstrict(page)
@@ -133,7 +94,7 @@ class AsyncRequestAcquisitionHTML:
         self.session = session
 
     @staticmethod
-    async def asnyc_request(url: str) -> tuple[str, int]:
+    async def asnyc_request(url: str) -> str:
         """request 요청 200 분류
 
         Args:
@@ -193,59 +154,52 @@ class AsyncRequestAcquisitionHTML:
                     return {self.url: response.status}
 
 
-# 임시 병렬 크롤링
-class WebCrawler:
-    def __init__(self, start_url: str, max_pages: int) -> None:
+class AsyncWebCrawler:
+    def __init__(self, start_url: str, max_pages: int, max_depth: int) -> None:
         self.start_url = start_url
         self.max_pages = max_pages
+        self.max_depth = max_depth
         self.visited_urls = set()
-        self.lock = Lock()
-        self.url_queue = Queue()  # Using a Queue
-        self.url_queue.put(start_url)
-        self.results: list[str] = []
+        self.url_queue = asyncio.Queue()
+        self.url_queue.put_nowait((start_url, 0))  # Put start URL with depth 0
+        self.results = []
 
-    def fetch_content(self, url: str) -> str | None:
-        try:
-            response = requests.get(url, timeout=5)
-            if response.status_code == 200:
-                return response.text
-            return None
-        except requests.RequestException:
-            return None
-
-    def parse_links(self, content: str) -> set[str]:
-        soup = BeautifulSoup(content, "html.parser")
+    def parse_links(self, content: str, base_url: str) -> set[str]:
+        soup = BeautifulSoup(content, "lxml")
         links = set()
         for a_tag in soup.find_all("a", href=True):
-            link = a_tag["href"]
+            link: str = a_tag["href"]
             if link.startswith("/"):
-                link = url_addition(link)
+                link = url_addition(base_url, link)
             if link.startswith("http"):
                 links.add(link)
         return links
 
-    def crawl(self) -> None:
+    async def crawl(self) -> None:
         while not self.url_queue.empty() and len(self.visited_urls) < self.max_pages:
-            current_url: str = self.url_queue.get()  # Get URL from the queue
+            current_url, depth = await self.url_queue.get()
 
-            with self.lock:
-                if current_url in self.visited_urls:
-                    continue
-                self.visited_urls.add(current_url)
+            if current_url in self.visited_urls or depth > self.max_depth:
+                continue
 
-            content: str = self.fetch_content(current_url)
+            self.visited_urls.add(current_url)
+
+            content = await AsyncRequestAcquisitionHTML.async_html(
+                "html", url=current_url
+            )
             if content:
                 self.results.append((current_url, content))
 
-                for link in self.parse_links(content, current_url):
-                    if link not in self.visited_urls:
-                        self.url_queue.put(link)  # Add new URLs to the queue
+                if depth < self.max_depth:
+                    new_links = self.parse_links(content, self.start_url)
+                    for link in new_links:
+                        if (
+                            link not in self.visited_urls
+                            and len(self.visited_urls) < self.max_pages
+                        ):
+                            await self.url_queue.put((link, depth + 1))
 
-    def run(self, num_threads: int = 4) -> list[str]:
-        threads = [Thread(target=self.crawl) for _ in range(num_threads)]
-        for thread in threads:
-            thread.start()
-        for thread in threads:
-            thread.join()
-
+    async def run(self, num_tasks: int = 4) -> list[str]:
+        tasks = [asyncio.create_task(self.crawl()) for _ in range(num_tasks)]
+        await asyncio.gather(*tasks)
         return self.results
