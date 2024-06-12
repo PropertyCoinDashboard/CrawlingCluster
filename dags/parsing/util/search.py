@@ -1,75 +1,8 @@
 import asyncio
-import requests
-from collections import deque
-
 import aiohttp
+
 from bs4 import BeautifulSoup
-from parsing.util.data_structure import indstrict
 from parsing.util.parser_util import url_addition
-from parsing.util._typing import (
-    UrlDataStructure,
-    OuterData,
-    ProcessUrlCollect,
-    UrlCollect,
-)
-
-
-# DFS 함수 정의
-def recursive_dfs(
-    node: int, graph: UrlDataStructure, discovered: list = None
-) -> list[int]:
-    if discovered is None:
-        discovered = []
-
-    discovered.append(node)
-    for n in graph.get(node, []):
-        if n not in discovered:
-            recursive_dfs(n, graph, discovered)
-
-    return discovered
-
-
-# BFS 함수 정의
-def iterative_bfs(start_v: int, graph: dict[int, list[str]]) -> UrlCollect:
-    start = deque()
-
-    visited = set()
-    queue = deque([start_v])
-    visited.add(start_v)
-    while queue:
-        node: int = queue.popleft()
-        if graph.get(node, []):
-            start.append(graph[node])
-            if node not in visited:
-                visited.add(node)
-                queue.append(node)
-
-    return start
-
-
-def deep_dive_search(page: ProcessUrlCollect, objection: str) -> UrlCollect:
-    """
-    Args:
-        page (ProcessUrlCollect): 크롤링하려는 프로세스
-        objection (str): 어떤 페이지에 할것인지
-
-    Returns:
-        UrlCollect: deque([URL 뭉치들]) [starting]
-    """
-    starting_queue = deque()
-    tree: UrlDataStructure = indstrict(page)
-    dfs: list[int] = recursive_dfs(1, tree)
-
-    print(f"{objection}의 검색된 노드의 순서 --> {dfs}")
-    for location in dfs:
-        try:
-            element: OuterData = tree[location]
-            for num in element.keys():
-                urls: list[str] = iterative_bfs(num, element).pop()
-                starting_queue.append(urls)
-        except (KeyError, IndexError):
-            continue
-    return starting_queue
 
 
 class AsyncRequestAcquisitionHTML:
