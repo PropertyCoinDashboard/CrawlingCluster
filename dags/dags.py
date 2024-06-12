@@ -1,125 +1,104 @@
-"""
-기능 테스트
-"""
-
-from typing import Any
-import time
+import asyncio
+from datetime import datetime, timedelta
 
 from airflow import DAG
-from airflow.utils.dates import days_ago
 from airflow.operators.python import PythonOperator
+from airflow.sensors.external_task import ExternalTaskSensor
 from airflow.operators.bash import BashOperator
-from airflow.providers.mysql.hooks.mysql import MySqlHook
 
-from parsing.naver_daum_news_api import (
-    NaverNewsParsingDriver,
-    DaumNewsParsingDriver,
-)
-
-from parsing.selenium_parsing import (
-    GoogleMovingElementsLocation,
-    BingMovingElementLocation,
-)
+from parsing.drive.naver_parsing_api import NaverNewsParsingDriver
+from parsing.operators.crawling import CrawlingOperator
+from parsing.hooks.db.hook import DatabaseHandler, Pipeline
 
 
-# # MySQL 연결 설정
-mysql_conn_id = "airflow-mysql"
-mysql_hook = MySqlHook(mysql_conn_id=mysql_conn_id)
+db_handler = DatabaseHandler()
+pipeline = Pipeline(db_handler)
 
 
-def naver(count: int, target: str) -> None:
-    NaverNewsParsingDriver(count, target).get_naver_news_data(),
+def response_html() -> dict[str, bool]:
+    data = NaverNewsParsingDriver("BTC", 10).fetch_page_urls()
+    loop = asyncio.get_event_loop()
+    play = loop.run_until_complete(data)
+
+    if play[1] == True:
+        return {"check_fn": True}
+    else:
+        return {"check_fn": False}
 
 
-def daum(count: int, target: str) -> None:
-    DaumNewsParsingDriver(count, target).get_daum_news_data(),
+def first_data_saving_task(**context) -> None:
+    pipeline.first_data_saving(**context)
 
 
-def process_google(**kwargs) -> Any:
-    return GoogleMovingElementsLocation(kwargs["target"], kwargs["count"]).search_box()
+def sync_aiorequest_injection(**context) -> list[dict[str]]:
+    loop = asyncio.get_event_loop()
+    if loop.is_running():
+        # 이미 이벤트 루프가 실행 중인 경우
+        result = loop.run_until_complete(pipeline.aiorequest_injection(**context))
+    else:
+        # 새로운 이벤트 루프를 시작
+        result = asyncio.run(pipeline.aiorequest_injection(**context))
+    return result
 
 
-def process_bing(**kwargs) -> Any:
-    return BingMovingElementLocation(kwargs["target"], kwargs["count"]).repeat_scroll()
-
-
-def driver_sleep():
-    time.sleep(30)
-
-
-with DAG(
-    dag_id="Crawling_data_API", start_date=days_ago(5), schedule_interval=None
-) as dag:
-
-    start_operator = BashOperator(
-        task_id="News_API_start", bash_command="echo crawling start!!", dag=dag
-    )
-
-    naver_api_operator = PythonOperator(
-        task_id="get_news_api_naver",
-        python_callable=naver,
-        op_args=[10, "BTC"],
-        dag=dag,
-    )
-
-    daum_api_operator = PythonOperator(
-        task_id="get_news_api_daum",
-        python_callable=daum,
-        op_args=[10, "BTC"],
-        dag=dag,
-    )
-
-    saving_operator = BashOperator(
-        task_id="News_API_saving", bash_command="echo saving complete!!", dag=dag
-    )
-
-    end_operator = BashOperator(
-        task_id="News_API_end", bash_command="echo end complete!!", dag=dag
-    )
-
-    start_operator >> naver_api_operator >> saving_operator >> end_operator
-    start_operator >> daum_api_operator >> saving_operator >> end_operator
+default_args = {
+    "owner": "airflow",
+    "depends_on_past": False,
+    "start_date": datetime(2024, 6, 10),
+    "email": ["limhaneul12@naver.com"],
+    "email_on_failure": True,
+    "email_on_retry": True,
+    "retries": 1,
+    "retry_delay": timedelta(minutes=10),
+}
 
 
 with DAG(
-    dag_id="Crawling_data_Selenium", start_date=days_ago(5), schedule_interval=None
+    dag_id="Crawling_data_API",
+    default_args=default_args,
+    # schedule_interval=timedelta(minutes=5),
+    catchup=False,
+    tags=["네이버 크롤링"],
 ) as dag:
 
+    response = PythonOperator(
+        task_id="api_call_task",
+        python_callable=response_html,
+        provide_context=True,
+    )
+
+    wait_for_api_response = ExternalTaskSensor(
+        task_id="wait_for_api_response",
+        external_dag_id="Crawling_data_API",
+        external_task_id=response.task_id,
+        mode="reschedule",
+        poke_interval=60,
+        timeout=600,
+        retries=3,
+    )
+
     start_operator = BashOperator(
-        task_id="News_API_start", bash_command="echo crawling start!!", dag=dag
+        task_id="News_API_start", bash_command="echo crawling start!!"
     )
 
-    google_sel_operator = PythonOperator(
-        task_id="get_news_api_google",
-        python_callable=process_google,
-        op_kwargs={"target": "BTC", "count": 2},
+    naver = CrawlingOperator(
+        task_id="naver_task",
+        count=10,
+        target="BTC",
+        site="naver",
+    )
+
+    status_requesting = PythonOperator(
+        task_id="classifier",
+        python_callable=sync_aiorequest_injection,
+        provide_context=True,
         dag=dag,
     )
 
-    sleep_driver_operator = PythonOperator(
-        task_id="driver_sleep", python_callable=driver_sleep, dag=dag
+    saving = PythonOperator(
+        task_id="saving", python_callable=first_data_saving_task, dag=dag
     )
 
-    bing_sel_operator = PythonOperator(
-        task_id="get_news_api_bing",
-        python_callable=process_bing,
-        op_kwargs={"target": "BTC", "count": 2},
-        dag=dag,
-    )
-
-    saving_operator = BashOperator(
-        task_id="News_API_saving", bash_command="echo saving complete!!", dag=dag
-    )
-
-    end_operator = BashOperator(
-        task_id="News_API_end", bash_command="echo end complete!!", dag=dag
-    )
-
-    (
-        start_operator
-        >> google_sel_operator
-        >> sleep_driver_operator
-        >> bing_sel_operator
-        >> saving_operator
-        >> end_operator
-    )
+    response >> wait_for_api_response >> start_operator >> naver
+    naver >> saving
+    naver >> status_requesting
