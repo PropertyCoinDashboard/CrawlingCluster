@@ -1,5 +1,3 @@
-from abc import ABC, abstractmethod
-
 import configparser
 from pathlib import Path
 from collections import deque
@@ -49,8 +47,8 @@ class NaverNewsParsingDriver:
             dict: JSON
         """
         try:
-            urls = await ARAH.async_html(
-                type_="json",
+            urls = await ARAH.async_fetch_content(
+                response_type="json",
                 url=self.url,
                 headers=self.header,
             )
@@ -78,6 +76,7 @@ class NaverNewsParsingDriver:
                 res_data[0]["items"],
             )
         )
+        print(data)
         urls = deque(data)
 
         return urls

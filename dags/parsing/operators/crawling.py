@@ -8,8 +8,10 @@ from parsing.protocol import CrawlingProcess
 
 
 class CrawlingOperator(BaseOperator):
+    """크롤링 operator"""
+
     @apply_defaults
-    def __init__(self, count: int, target: str, site: str, *args, **kwargs):
+    def __init__(self, count: int, target: str, site: str, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.count = count
         self.target = target

@@ -1,9 +1,8 @@
 import asyncio
+import requests
 from collections import deque
 
-
 import aiohttp
-from aiohttp.client_exceptions import ClientConnectorError
 from bs4 import BeautifulSoup
 from parsing.util.data_structure import indstrict
 from parsing.util.parser_util import url_addition
@@ -81,81 +80,94 @@ class AsyncRequestAcquisitionHTML:
         params: dict[str, str] | None = None,
         headers: dict[str, str] | None = None,
     ) -> None:
-        """비동기 세션
-
-        Args:
-            session (aiohttp.ClientSession): 비동기 세션
-            url (str): 타겟 URL
-            params (dict[str, str] | None, optional): 파라미터. 기본은 None.
-            headers (dict[str, str] | None, optional): 헤더. 기본은 None.
-        """
         self.url = url
         self.params = params
         self.headers = headers
         self.session = session
 
-    @staticmethod
-    async def asnyc_request(url: str) -> str | dict[str, int]:
-        """request 요청 200 분류
-
-        Args:
-            url (str): 타겟 URL
-
-        Returns:
-            tuple[str, int]: (url, status_code)
-        """
-        async with aiohttp.ClientSession() as session:
-            return await AsyncRequestAcquisitionHTML(
-                session, url
-            ).asnyc_status_classifer()
-
-    @staticmethod
-    async def async_html(
-        type_: str,
-        url: str,
-        params: dict[str, str] | None = None,
-        headers: dict[str, str] | None = None,
+    async def async_source(
+        self, response: aiohttp.ClientResponse, response_type: str
     ) -> str | dict:
-        """html or json
+        """비동기 방식으로 원격 자원에서 HTML 또는 JSON 데이터를 가져옴
 
         Args:
-            type_ (str): 타입 (HTML, JSON)
-            url (str): 타겟 URL
-            params (dict[str, str] | None, optional): 파라미터. 기본은 None.
-            headers (dict[str, str] | None, optional): 헤더. 기본은 None.
+            response (aiohttp.ClientResponse) : session
+            response_type (str): 가져올 데이터의 유형 ("html" 또는 "json")
 
         Returns:
-            _type_: 각 형태에 맞춰서 리턴 HTML(str) or JSON
+            str | dict: HTML 또는 JSON 데이터
         """
-        async with aiohttp.ClientSession() as session:
-            try:
-                return await AsyncRequestAcquisitionHTML(
-                    session, url, params, headers
-                ).async_source(type_)
-            except ClientConnectorError:
-                return None
+        match response_type:
+            case "html":
+                return await response.text()
+            case "json":
+                return await response.json()
 
-    async def async_source(self, type_: str) -> str | dict:
-        """위에 쓰고 있는 함수 본체"""
+    async def async_request(
+        self, response: aiohttp.ClientResponse
+    ) -> str | dict[str, int] | dict[str, str]:
+        """비동기 방식으로 원격 자원에 요청하고 상태 코드를 분류함
+
+        Args:
+            response (aiohttp.ClientResponse) : session
+
+        Returns:
+            str | dict[str, int | str]: 요청 결과 URL 또는 상태 코드
+        """
+        match response.status:
+            case 200:
+                return self.url
+            case _:
+                return {"status": response.status}
+
+    async def async_type(
+        self, type_: str, source: str = None
+    ) -> str | dict | dict[str, int] | dict[str, str] | None:
         async with self.session.get(
             url=self.url, params=self.params, headers=self.headers
         ) as response:
             match type_:
-                case "html":
-                    return await response.text()
-                case "json":
-                    return await response.json()
+                case "source":
+                    return await self.async_source(response, source)
+                case "request":
+                    return await self.async_request(response)
 
-    async def asnyc_status_classifer(self) -> str | dict[str, int]:
-        """위에 쓰고 있는 함수 본체"""
-        async with self.session.get(
-            url=self.url, params=self.params, headers=self.headers
-        ) as response:
-            match response.status:
-                case 200:
-                    return self.url
-                case _:
-                    return {"status": response.status}
+    # fmt: off
+    @staticmethod
+    async def async_request_status(url: str) -> str | dict[str, int] | dict[str, str]:
+        """주어진 URL에 대해 비동기 방식으로 요청하고 상태 코드를 반환함
+
+        Args:
+            url (str): 요청할 URL
+
+        Returns:
+            str | dict[str, int] | dict[str, str] : 요청 결과 URL 또는 상태 코드
+        """
+        async with aiohttp.ClientSession() as session:
+            return await AsyncRequestAcquisitionHTML(session, url).async_type(type_="request")
+
+    @staticmethod
+    async def async_fetch_content(
+        response_type: str,
+        url: str,
+        params: dict[str, str] | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> str | dict:
+        """비동기 방식으로 원격 자원에서 HTML 또는 JSON 데이터를 가져옴
+
+        Args:
+            response_type (str): 가져올 데이터의 유형 ("html" 또는 "json")
+            url (str): 가져올 데이터의 URL
+            params (dict[str, str] | None, optional): 요청 시 사용할 파라미터
+            headers (dict[str, str] | None, optional): 요청 시 사용할 헤더
+
+        Returns:
+            str | dict: HTML 또는 JSON 데이터
+        """
+        async with aiohttp.ClientSession() as session:
+            return await AsyncRequestAcquisitionHTML(
+                    session, url, params, headers
+                ).async_type(type_="source", source=response_type)
 
 
 class AsyncWebCrawler:
@@ -187,7 +199,9 @@ class AsyncWebCrawler:
                 continue
 
             self.visited_urls.add(current_url)
-            content = await AsyncRequestAcquisitionHTML.async_html("html", current_url)
+            content = await AsyncRequestAcquisitionHTML.async_fetch_content(
+                "html", current_url
+            )
 
             if content:
                 if depth < self.max_depth:
