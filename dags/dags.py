@@ -2,9 +2,10 @@ import asyncio
 from datetime import datetime, timedelta
 
 from airflow import DAG
+from airflow.operators.bash import BashOperator
 from airflow.operators.python import PythonOperator
 from airflow.sensors.external_task import ExternalTaskSensor
-from airflow.operators.bash import BashOperator
+from airflow.providers.mysql.operators.mysql import MySqlOperator
 
 from parsing.drive.naver_parsing_api import NaverNewsParsingDriver
 from parsing.operators.crawling import CrawlingOperator
@@ -30,15 +31,12 @@ def first_data_saving_task(**context) -> None:
     pipeline.first_data_saving(**context)
 
 
-def sync_aiorequest_injection(**context) -> list[dict[str]]:
+def async_process_injection(**context) -> list:
     loop = asyncio.get_event_loop()
     if loop.is_running():
-        # 이미 이벤트 루프가 실행 중인 경우
-        result = loop.run_until_complete(pipeline.aiorequest_injection(**context))
+        loop.run_until_complete(context["process"](**context))
     else:
-        # 새로운 이벤트 루프를 시작
-        result = asyncio.run(pipeline.aiorequest_injection(**context))
-    return result
+        asyncio.run(context["process"](**context))
 
 
 default_args = {
@@ -56,7 +54,7 @@ default_args = {
 with DAG(
     dag_id="Crawling_data_API",
     default_args=default_args,
-    # schedule_interval=timedelta(minutes=5),
+    schedule_interval=timedelta(minutes=10),
     catchup=False,
     tags=["네이버 크롤링"],
 ) as dag:
@@ -90,7 +88,8 @@ with DAG(
 
     status_requesting = PythonOperator(
         task_id="classifier",
-        python_callable=sync_aiorequest_injection,
+        python_callable=async_process_injection,
+        op_kwargs={"process": pipeline.aiorequest_injection},
         provide_context=True,
         dag=dag,
     )
@@ -102,3 +101,45 @@ with DAG(
     response >> wait_for_api_response >> start_operator >> naver
     naver >> saving
     naver >> status_requesting
+
+
+def create_url_status_dag(dag_id, query_table) -> DAG:
+    with DAG(
+        dag_id=dag_id,
+        default_args=default_args,
+        schedule_interval=timedelta(minutes=10),
+        catchup=False,
+        tags=["URL status 분석"],
+    ) as dag:
+        url_selection = MySqlOperator(
+            task_id="mysql_query",
+            mysql_conn_id="airflow-mysql",
+            sql=f"""
+                SELECT 
+                    JSON_OBJECT(
+                        "id", id, 
+                        "link", url, 
+                        "title", title, 
+                        "date", TIMESTAMP(created_at)
+                    ) 
+                FROM 
+                    dash.{query_table};
+                """,
+            dag=dag,
+        )
+
+        process_url_data_task = PythonOperator(
+            task_id="process_url_data",
+            python_callable=async_process_injection,
+            op_kwargs={"process": pipeline.fetch_and_convert_to_json},
+            provide_context=True,
+            dag=dag,
+        )
+
+        url_selection >> process_url_data_task
+
+    return dag
+
+
+dag1 = create_url_status_dag("another_request_check", "not_request_url")
+dag2 = create_url_status_dag("200_request_check", "request_url")
