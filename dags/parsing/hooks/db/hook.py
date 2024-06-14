@@ -254,7 +254,7 @@ class Pipeline:
 
     async def saving_task(self, process: Callable, urls) -> None:
         if len(urls) != 0:
-            await asyncio.gather(process(data) for data in urls[0])
+            await asyncio.gather(process(data) for data in urls)
 
     async def not_request_saving(self, **context) -> None:
         urls = context["ti"].xcom_pull(key="not_request_url")
