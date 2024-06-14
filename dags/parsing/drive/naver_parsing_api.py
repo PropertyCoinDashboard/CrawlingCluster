@@ -35,7 +35,7 @@ class NaverNewsParsingDriver:
             "X-Naver-Client-Secret": naver_secret,
         }
         self.url = (
-            f"{naver_url}/news.json?query={self.target}&start={self.count}&display=100"
+            f"{naver_url}/news.json?query={self.target}&start={self.count}&display=50"
         )
 
     async def fetch_page_urls(self) -> dict:

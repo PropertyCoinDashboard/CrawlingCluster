@@ -89,7 +89,23 @@ with DAG(
     status_requesting = PythonOperator(
         task_id="classifier",
         python_callable=async_process_injection,
-        op_kwargs={"process": pipeline.aiorequest_injection},
+        op_kwargs={"process": pipeline.aiorequest_classification},
+        provide_context=True,
+        dag=dag,
+    )
+
+    not_request = PythonOperator(
+        task_id="not_request",
+        python_callable=async_process_injection,
+        op_kwargs={"process": pipeline.not_request_saving},
+        provide_context=True,
+        dag=dag,
+    )
+
+    request_200 = PythonOperator(
+        task_id="200_request",
+        python_callable=async_process_injection,
+        op_kwargs={"process": pipeline.request_saving},
         provide_context=True,
         dag=dag,
     )
@@ -98,9 +114,9 @@ with DAG(
         task_id="saving", python_callable=first_data_saving_task, dag=dag
     )
 
-    response >> wait_for_api_response >> start_operator >> naver
-    naver >> saving
-    naver >> status_requesting
+    response >> wait_for_api_response >> start_operator >> naver >> saving
+    naver >> status_requesting >> not_request
+    naver >> status_requesting >> request_200
 
 
 def create_url_status_dag(dag_id, query_table) -> DAG:
@@ -112,7 +128,7 @@ def create_url_status_dag(dag_id, query_table) -> DAG:
         tags=["URL status 분석"],
     ) as dag:
         url_selection = MySqlOperator(
-            task_id="mysql_query",
+            task_id="first_mysql_query",
             mysql_conn_id="airflow-mysql",
             sql=f"""
                 SELECT 
@@ -131,7 +147,7 @@ def create_url_status_dag(dag_id, query_table) -> DAG:
         process_url_data_task = PythonOperator(
             task_id="process_url_data",
             python_callable=async_process_injection,
-            op_kwargs={"process": pipeline.fetch_and_convert_to_json},
+            op_kwargs={"process": pipeline.retry_status_classifcation},
             provide_context=True,
             dag=dag,
         )

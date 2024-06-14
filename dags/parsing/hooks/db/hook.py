@@ -1,6 +1,7 @@
 import json
 import logging
-from typing import Any, Union
+import asyncio
+from typing import Any, Union, Callable
 from datetime import datetime
 
 import requests
@@ -66,7 +67,7 @@ class DatabaseHandler:
         )
         self.insert_data("dash.not_request_url", columns, values)
 
-    def insert_ready_status(self, data: dict[str, str], content: str) -> None:
+    def insert_ready_status(self, data: dict[str, str]) -> None:
         """준비된 URL에 대한 데이터를 데이터베이스에 넣음.
 
         Args:
@@ -78,7 +79,7 @@ class DatabaseHandler:
             200,
             data.get("link"),
             data.get("title"),
-            content,
+            data.get("content"),
             data.get("date"),
             datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         )
@@ -122,7 +123,9 @@ class URLClassifier:
     def __init__(self, db_handler: DatabaseHandler) -> None:
         self.db_handler = db_handler
 
-    async def handle_async_request(self, result: dict[str, str]) -> None:
+    async def handle_async_request(
+        self, result: dict[str, str], retry: bool | None
+    ) -> dict[str, str] | None:
         """
         Args:
             result (dict[str, str]): 처리할 결과를 담은 사전. 'link'와 'id'를 포함.
@@ -144,39 +147,51 @@ class URLClassifier:
             result["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             match req:
                 case str():
-                    excutor: bool | None = self.db_handler.delete_from_database(
-                        table="not_request_url", id=result.get("id")
-                    )
                     content: str = fetch_content(link)
+                    result["content"] = content
 
-                    if excutor:
-                        self.db_handler.insert_ready_status(result, content)
-                    else:
-                        self.db_handler.insert_ready_status(result, content)
+                    if retry:
+                        excutor: bool | None = self.db_handler.delete_from_database(
+                            table="not_request_url", id=result.get("id")
+                        )
+                        if excutor:
+                            self.db_handler.insert_ready_status(result, content)
+                        else:
+                            pass
+
+                    if retry is None:
+                        return result
                 case dict():
-                    excutor: bool | None = self.db_handler.delete_from_database(
-                        table="request_url", id=result.get("id")
-                    )
                     result["status"] = req["status"]
+                    if retry:
+                        excutor: bool | None = self.db_handler.delete_from_database(
+                            table="request_url", id=result.get("id")
+                        )
+                        if excutor:
+                            self.db_handler.insert_not_ready_status(result)
+                        else:
+                            pass
 
-                    if excutor:
-                        self.db_handler.insert_not_ready_status(result)
-                    else:
-                        self.db_handler.insert_not_ready_status(result)
+                    if retry is None:
+                        return result
 
         except (requests.exceptions.RequestException, ClientConnectorSSLError) as e:
             logger.error(f"Error occurred during request handling: {e}")
             result["status"] = 500
             result["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            self.db_handler.insert_not_ready_status(result)
+            return result
 
-    async def classify(self, result: dict[str, Union[str, int]]) -> None:
-        """URL을 분류하고 데이터베이스에 넣기"""
-        await self.handle_async_request(result)
-
-    async def retry_request_classify(self, result: dict[str, Union[str, int]]) -> None:
+    async def retry_request_classify(
+        self, result: dict[str, Union[str, int]]
+    ) -> dict[str, str] | None:
         """재시도를 통해 URL을 분류하고 데이터베이스에 넣기"""
-        await self.handle_async_request(result)
+        return await self.handle_async_request(result, retry=True)
+
+    async def request_classify(
+        self, result: dict[str, Union[str, int]]
+    ) -> dict[str, str] | None:
+        """재시도를 통해 URL을 분류하고 데이터베이스에 넣기"""
+        return await self.handle_async_request(result, retry=None)
 
 
 class Pipeline:
@@ -196,24 +211,55 @@ class Pipeline:
         for data in urls:
             self.db_handler.insert_total_url(data)
 
-    async def fetch_and_convert_to_json(self, **context) -> None:
-        json_url_data = context["ti"].xcom_pull(
-            task_ids=context["task"].upstream_task_ids
-        )
-        for data in json_url_data:
-            for type_tuple in data:
-                for type_json in type_tuple:
-                    await self.url_classifier.retry_request_classify(
-                        json.loads(type_json)
-                    )
+    async def process_url(self, url: list[list[dict]], class_func: Callable) -> None:
+        data = []
+        for type_list_1 in url:
+            for type_list_2 in type_list_1:
+                if class_func.__name__ == "request_classify":
+                    data.append(await class_func(type_list_2))
+                if class_func.__name__ == "retry_request_classify":
+                    class_func(type_list_2)
+        return data
 
-    async def aiorequest_injection(self, **context: dict[str, Any]) -> None:
+    async def retry_status_classifcation(self, **context: dict[str, Any]) -> None:
+        urls = context["ti"].xcom_pull(task_ids=context["task"].upstream_task_ids)
+        address = self.url_classifier.retry_request_classify
+        await asyncio.gather(self.process_url(url=urls, class_func=address))
+
+    async def aiorequest_classification(self, **context: dict[str, Any]) -> None:
         """비동기 요청을 주입하고 분류
 
         Args:
             **context (dict[str, Any]): 태스크 컨텍스트.
         """
         urls = context["ti"].xcom_pull(task_ids=context["task"].upstream_task_ids)
-        for data in urls:
-            for tud in data:
-                await self.url_classifier.classify(tud)
+        task_instance = context["ti"]
+
+        request = []
+        not_request = []
+        address = self.url_classifier.request_classify
+
+        data = await asyncio.gather(
+            self.process_url(urls, address), return_exceptions=True
+        )
+        for i in data:
+            for j in i:
+                if j.get("status") is not None:
+                    not_request.append(j)
+                else:
+                    request.append(j)
+
+        task_instance.xcom_push(key="request_url", value=request)
+        task_instance.xcom_push(key="not_request_url", value=not_request)
+
+    async def saving_task(self, process: Callable, urls) -> None:
+        if len(urls) != 0:
+            await asyncio.gather(process(data) for data in urls[0])
+
+    async def not_request_saving(self, **context) -> None:
+        urls = context["ti"].xcom_pull(key="not_request_url")
+        await self.saving_task(self.db_handler.insert_not_ready_status, urls)
+
+    async def request_saving(self, **context) -> None:
+        urls = context["ti"].xcom_pull(key="request_url")
+        await self.saving_task(self.db_handler.insert_ready_status, urls)
