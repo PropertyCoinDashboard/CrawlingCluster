@@ -94,7 +94,7 @@ class DatabaseHandler:
         for url in urls:
             self.mysql_hook.run(query, parameters=(url["link"], url["date"]))
 
-    def delete_from_database(self, table: str, id: int) -> bool:
+    def delete_from_database(self, table: str, id: int) -> bool | None:
         """
         주어진 id와 테이블명에 해당하는 레코드를 MySQL 데이터베이스에서 삭제합니다 (레코드가 존재할 경우에만).
 
@@ -144,7 +144,7 @@ class URLClassifier:
             result["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             match req:
                 case str():
-                    excutor: bool = self.db_handler.delete_from_database(
+                    excutor: bool | None = self.db_handler.delete_from_database(
                         table="not_request_url", id=result.get("id")
                     )
                     content: str = fetch_content(link)
@@ -154,7 +154,7 @@ class URLClassifier:
                     else:
                         self.db_handler.insert_ready_status(result, content)
                 case dict():
-                    excutor: bool = self.db_handler.delete_from_database(
+                    excutor: bool | None = self.db_handler.delete_from_database(
                         table="request_url", id=result.get("id")
                     )
                     result["status"] = req["status"]
