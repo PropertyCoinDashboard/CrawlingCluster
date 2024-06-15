@@ -1,4 +1,5 @@
 import json
+import builtins
 import logging
 import asyncio
 from typing import Any, Union, Callable
@@ -8,7 +9,11 @@ import requests
 from bs4 import BeautifulSoup
 
 from airflow.providers.mysql.hooks.mysql import MySqlHook
-from aiohttp.client_exceptions import ClientConnectorSSLError
+from aiohttp.client_exceptions import (
+    ClientConnectorSSLError,
+    ServerDisconnectedError,
+    ClientOSError,
+)
 from parsing.util.search import AsyncRequestAcquisitionHTML as ARAH
 
 logging.basicConfig(level=logging.INFO)
@@ -95,7 +100,7 @@ class DatabaseHandler:
         for url in urls:
             self.mysql_hook.run(query, parameters=(url["link"], url["date"]))
 
-    def delete_from_database(self, table: str, id: int) -> bool | None:
+    def delete_from_database(self, table: str, id: int) -> bool:
         """
         주어진 id와 테이블명에 해당하는 레코드를 MySQL 데이터베이스에서 삭제합니다 (레코드가 존재할 경우에만).
 
@@ -114,7 +119,7 @@ class DatabaseHandler:
 
             return True
 
-        return None
+        return False
 
 
 class URLClassifier:
@@ -122,6 +127,20 @@ class URLClassifier:
 
     def __init__(self, db_handler: DatabaseHandler) -> None:
         self.db_handler = db_handler
+
+    async def data_checking(
+        self, retry: bool, result: dict[str, str], delete_table: str, process: Callable
+    ) -> dict[str, str] | None:
+        if retry:
+            excutor: bool | None = self.db_handler.delete_from_database(
+                table=delete_table, id=result.get("id")
+            )
+            if excutor:
+                process(result)
+            else:
+                print("넘어갑니다")
+        else:
+            return result
 
     async def handle_async_request(
         self, result: dict[str, str], retry: bool | None
@@ -145,41 +164,40 @@ class URLClassifier:
                 await ARAH.async_request_status(link)
             )
             result["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            match req:
-                case str():
+            match type(req):
+                case builtins.str:
                     content: str = fetch_content(link)
                     result["content"] = content
-
-                    if retry:
-                        excutor: bool | None = self.db_handler.delete_from_database(
-                            table="not_request_url", id=result.get("id")
-                        )
-                        if excutor:
-                            self.db_handler.insert_ready_status(result, content)
-                        else:
-                            pass
-
-                    if retry is None:
-                        return result
-                case dict():
+                    return await self.data_checking(
+                        result=result,
+                        retry=retry,
+                        delete_table="not_request_url",
+                        process=self.db_handler.insert_ready_status,
+                    )
+                case builtins.dict:
                     result["status"] = req["status"]
-                    if retry:
-                        excutor: bool | None = self.db_handler.delete_from_database(
-                            table="request_url", id=result.get("id")
-                        )
-                        if excutor:
-                            self.db_handler.insert_not_ready_status(result)
-                        else:
-                            pass
+                    return await self.data_checking(
+                        result=result,
+                        retry=retry,
+                        delete_table="request_url",
+                        process=self.db_handler.insert_not_ready_status,
+                    )
 
-                    if retry is None:
-                        return result
-
-        except (requests.exceptions.RequestException, ClientConnectorSSLError) as e:
+        except (
+            requests.exceptions.RequestException,
+            ClientConnectorSSLError,
+            ServerDisconnectedError,
+            ClientOSError,
+        ) as e:
             logger.error(f"Error occurred during request handling: {e}")
             result["status"] = 500
             result["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            return result
+            return await self.data_checking(
+                result=result,
+                retry=retry,
+                delete_table="request_url",
+                process=self.db_handler.insert_not_ready_status,
+            )
 
     async def retry_request_classify(
         self, result: dict[str, Union[str, int]]
@@ -191,13 +209,18 @@ class URLClassifier:
         self, result: dict[str, Union[str, int]]
     ) -> dict[str, str] | None:
         """재시도를 통해 URL을 분류하고 데이터베이스에 넣기"""
-        return await self.handle_async_request(result, retry=None)
+        return await self.handle_async_request(result, retry=False)
 
 
 class Pipeline:
     """URL 처리를 위한 파이프라인을 실행"""
 
     def __init__(self, db_handler: DatabaseHandler) -> None:
+        """파이프라인 초기화
+
+        Args:
+            db_handler (DatabaseHandler): 데이터베이스 핸들러
+        """
         self.db_handler = db_handler
         self.url_classifier = URLClassifier(db_handler)
 
@@ -211,55 +234,78 @@ class Pipeline:
         for data in urls:
             self.db_handler.insert_total_url(data)
 
-    async def process_url(self, url: list[list[dict]], class_func: Callable) -> None:
-        data = []
-        for type_list_1 in url:
-            for type_list_2 in type_list_1:
-                if class_func.__name__ == "request_classify":
-                    data.append(await class_func(type_list_2))
-                if class_func.__name__ == "retry_request_classify":
-                    class_func(type_list_2)
-        return data
+    async def process_url(self, url: list[list[dict]], class_func: Callable) -> Any:
+        """URL을 처리하여 비동기적으로 요청
+
+        Args:
+            url (list[list[dict]]): 처리할 URL 목록
+            class_func (Callable): URL을 처리할 함수
+        """
+        match type(url[0]):
+            case builtins.tuple:
+                tasks: list[dict[str, str]] = [
+                    class_func(json.loads(*url[0][i])) for i in range(len(url[0]))
+                ]
+                return await asyncio.gather(*tasks, return_exceptions=False)
+            case builtins.list:
+                tasks = [class_func(item) for sublist in url for item in sublist]
+                return await asyncio.gather(*tasks, return_exceptions=False)
 
     async def retry_status_classifcation(self, **context: dict[str, Any]) -> None:
+        """재시도를 통해 URL 상태를 분류
+
+        Args:
+            **context (dict[str, Any]): 태스크 컨텍스트
+        """
         urls = context["ti"].xcom_pull(task_ids=context["task"].upstream_task_ids)
-        address = self.url_classifier.retry_request_classify
-        await asyncio.gather(self.process_url(url=urls, class_func=address))
+        await self.process_url(urls, self.url_classifier.retry_request_classify)
 
     async def aiorequest_classification(self, **context: dict[str, Any]) -> None:
         """비동기 요청을 주입하고 분류
 
         Args:
-            **context (dict[str, Any]): 태스크 컨텍스트.
+            **context (dict[str, Any]): 태스크 컨텍스트
         """
         urls = context["ti"].xcom_pull(task_ids=context["task"].upstream_task_ids)
         task_instance = context["ti"]
 
-        request = []
-        not_request = []
-        address = self.url_classifier.request_classify
+        # 비동기 분류
+        data = await self.process_url(urls, self.url_classifier.request_classify)
+        request, not_request = [], []
 
-        data = await asyncio.gather(
-            self.process_url(urls, address), return_exceptions=True
-        )
-        for i in data:
-            for j in i:
-                if j.get("status") is not None:
-                    not_request.append(j)
-                else:
-                    request.append(j)
+        for item in data:
+            if item and item.get("status") is not None:
+                not_request.append(item)
+            else:
+                request.append(item)
 
         task_instance.xcom_push(key="request_url", value=request)
         task_instance.xcom_push(key="not_request_url", value=not_request)
 
     async def saving_task(self, process: Callable, urls) -> None:
+        """비동기적으로 작업을 저장
+
+        Args:
+            process (Callable): 처리 함수
+            urls (list): 저장할 URL 목록
+        """
         if len(urls) != 0:
             await asyncio.gather(process(data) for data in urls)
 
-    async def not_request_saving(self, **context) -> None:
+    async def not_request_saving(self, **context: dict[str, Any]) -> None:
+        """200을 제외한 URL을 저장
+
+        Args:
+            **context (dict[str, Any]): 태스크 컨텍스트
+        """
         urls = context["ti"].xcom_pull(key="not_request_url")
         await self.saving_task(self.db_handler.insert_not_ready_status, urls)
 
-    async def request_saving(self, **context) -> None:
+    async def request_saving(self, **context: dict[str, Any]) -> None:
+        """200 URL을 저장
+
+        Args:
+            **context (dict[str, Any]): 태스크 컨텍스트
+        """
         urls = context["ti"].xcom_pull(key="request_url")
         await self.saving_task(self.db_handler.insert_ready_status, urls)
