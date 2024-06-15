@@ -10,6 +10,11 @@ from airflow.providers.mysql.operators.mysql import MySqlOperator
 from parsing.drive.naver_parsing_api import NaverNewsParsingDriver
 from parsing.operators.crawling import CrawlingOperator
 from parsing.hooks.db.hook import DatabaseHandler, Pipeline
+from parsing.hooks.db.data_hook import (
+    data_list_change,
+    deep_crawling_run,
+    preprocessing,
+)
 
 
 db_handler = DatabaseHandler()
@@ -44,8 +49,8 @@ default_args = {
     "depends_on_past": False,
     "start_date": datetime(2024, 6, 10),
     "email": ["limhaneul12@naver.com"],
-    "email_on_failure": True,
-    "email_on_retry": True,
+    "email_on_failure": False,
+    "email_on_retry": False,
     "retries": 1,
     "retry_delay": timedelta(minutes=10),
 }
@@ -117,6 +122,73 @@ with DAG(
     response >> wait_for_api_response >> start_operator >> naver >> saving
     naver >> status_requesting >> not_request
     naver >> status_requesting >> request_200
+
+with DAG(
+    dag_id="deep_data_API",
+    default_args=default_args,
+    schedule=None,
+    schedule_interval=None,
+    tags=["딥 크롤링"],
+) as dag:
+
+    url_selection = MySqlOperator(
+        task_id="mysql_query",
+        mysql_conn_id="airflow-mysql",
+        sql="SELECT url FROM dash.request_url;",
+        dag=dag,
+    )
+
+    hooking = PythonOperator(
+        task_id="list_change",
+        python_callable=data_list_change,
+        provide_context=True,
+        dag=dag,
+    )
+    th = PythonOperator(
+        task_id="async_change",
+        python_callable=async_process_injection,
+        op_kwargs={"process": deep_crawling_run},
+        provide_context=True,
+        dag=dag,
+    )
+
+    prepro = PythonOperator(
+        task_id="dddd", python_callable=preprocessing, provide_context=True, dag=dag
+    )
+
+    status_requesting = PythonOperator(
+        task_id="deep_classifier",
+        python_callable=async_process_injection,
+        op_kwargs={"process": pipeline.aiorequest_classification},
+        provide_context=True,
+        dag=dag,
+    )
+
+    not_request = PythonOperator(
+        task_id="dee_not_request",
+        python_callable=async_process_injection,
+        op_kwargs={"process": pipeline.not_request_saving},
+        provide_context=True,
+        dag=dag,
+    )
+
+    request_200 = PythonOperator(
+        task_id="deee200_request",
+        python_callable=async_process_injection,
+        op_kwargs={"process": pipeline.request_saving},
+        provide_context=True,
+        dag=dag,
+    )
+
+    (
+        url_selection
+        >> hooking
+        >> th
+        >> prepro
+        >> status_requesting
+        >> not_request
+        >> request_200
+    )
 
 
 def create_url_status_dag(dag_id, query_table) -> DAG:

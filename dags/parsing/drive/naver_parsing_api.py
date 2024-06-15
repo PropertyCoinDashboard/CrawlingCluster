@@ -76,7 +76,6 @@ class NaverNewsParsingDriver:
                 res_data[0]["items"],
             )
         )
-        print(data)
         urls = deque(data)
 
         return urls

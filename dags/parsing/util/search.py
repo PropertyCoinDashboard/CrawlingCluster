@@ -1,6 +1,6 @@
 import asyncio
 import aiohttp
-
+from datetime import datetime
 from bs4 import BeautifulSoup
 from parsing.util.parser_util import url_addition
 
@@ -113,16 +113,33 @@ class AsyncWebCrawler:
         self.url_queue.put_nowait((start_url, 0))  # Put start URL with depth 0
         self.results = {}
 
-    def parse_links(self, content: str, base_url: str) -> set[str]:
+    def parse_links(
+        self, content: str, base_url: str
+    ) -> tuple[set, list[dict[str, str]]]:
         soup = BeautifulSoup(content, "lxml")
         links = set()
+        data_list: list[dict[str, str]] = []
+
         for a_tag in soup.find_all("a", href=True):
             link: str = a_tag["href"]
+
+            # 자바스크립트 링크 제외
+            if link.startswith("javascript:"):
+                continue
+
             if link.startswith("/"):
                 link = url_addition(base_url, link)
             if link.startswith("http"):
                 links.add(link)
-        return links
+
+            # 링크 정보를 데이터 포맷에 추가
+            data_format = {
+                "title": a_tag.text,
+                "link": link,
+                "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            }
+            data_list.append(data_format)
+        return links, data_list
 
     async def crawl(self) -> None:
         while not self.url_queue.empty() and len(self.visited_urls) < self.max_pages:
@@ -138,8 +155,8 @@ class AsyncWebCrawler:
 
             if content:
                 if depth < self.max_depth:
-                    new_links = self.parse_links(content, current_url)
-                    self.results[current_url] = new_links
+                    new_links, url_format = self.parse_links(content, current_url)
+                    self.results[current_url] = url_format
                     for link in new_links:
                         if link not in self.visited_urls:
                             await self.url_queue.put((link, depth + 1))

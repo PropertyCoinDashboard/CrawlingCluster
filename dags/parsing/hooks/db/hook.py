@@ -15,6 +15,7 @@ from aiohttp.client_exceptions import (
     ClientOSError,
 )
 from parsing.util.search import AsyncRequestAcquisitionHTML as ARAH
+from MySQLdb._exceptions import DatabaseError, DataError
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -79,16 +80,26 @@ class DatabaseHandler:
             data (dict[str, str]): 넣을 데이터.
             content (str): URL의 콘텐츠.
         """
-        columns = ("status_code", "url", "title", "content", "created_at", "updated_at")
-        values = (
-            200,
-            data.get("link"),
-            data.get("title"),
-            data.get("content"),
-            data.get("date"),
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        )
-        self.insert_data("dash.request_url", columns, values)
+        try:
+            columns = (
+                "status_code",
+                "url",
+                "title",
+                "content",
+                "created_at",
+                "updated_at",
+            )
+            values = (
+                200,
+                data.get("link"),
+                data.get("title"),
+                data.get("content"),
+                data.get("date"),
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            )
+            self.insert_data("dash.request_url", columns, values)
+        except (DatabaseError, DataError):
+            pass
 
     def insert_total_url(self, urls: list[dict[str, str]]) -> None:
         """URL을 데이터베이스에 넣기.
@@ -159,6 +170,7 @@ class URLClassifier:
                     - 'not_ready_status'로 저장.
         """
         try:
+
             link: str | None = result.get("link")
             req: str | dict[str, int] | dict[str, str] = (
                 await ARAH.async_request_status(link)
@@ -188,6 +200,7 @@ class URLClassifier:
             ClientConnectorSSLError,
             ServerDisconnectedError,
             ClientOSError,
+            requests.exceptions.InvalidURL,
         ) as e:
             logger.error(f"Error occurred during request handling: {e}")
             result["status"] = 500
@@ -246,10 +259,10 @@ class Pipeline:
                 tasks: list[dict[str, str]] = [
                     class_func(json.loads(*url[0][i])) for i in range(len(url[0]))
                 ]
-                return await asyncio.gather(*tasks, return_exceptions=False)
+                return await asyncio.gather(*tasks, return_exceptions=True)
             case builtins.list:
                 tasks = [class_func(item) for sublist in url for item in sublist]
-                return await asyncio.gather(*tasks, return_exceptions=False)
+                return await asyncio.gather(*tasks, return_exceptions=True)
 
     async def retry_status_classifcation(self, **context: dict[str, Any]) -> None:
         """재시도를 통해 URL 상태를 분류
@@ -272,7 +285,6 @@ class Pipeline:
         # 비동기 분류
         data = await self.process_url(urls, self.url_classifier.request_classify)
         request, not_request = [], []
-
         for item in data:
             if item and item.get("status") is not None:
                 not_request.append(item)
