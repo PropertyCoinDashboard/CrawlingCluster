@@ -1,9 +1,13 @@
+import re
 import json
 import builtins
 import logging
 import asyncio
 from typing import Any, Union, Callable
+from itertools import chain
+from collections import Counter
 from datetime import datetime
+from konlpy.tag import Okt
 
 import requests
 from bs4 import BeautifulSoup
@@ -13,7 +17,9 @@ from aiohttp.client_exceptions import (
     ClientConnectorSSLError,
     ServerDisconnectedError,
     ClientOSError,
+    InvalidURL,
 )
+from aiohttp.client_exceptions import ServerTimeoutError
 from parsing.util.search import AsyncRequestAcquisitionHTML as ARAH
 from MySQLdb._exceptions import DatabaseError, DataError
 
@@ -32,7 +38,21 @@ def fetch_content(link: str) -> str:
     """
     response = requests.get(link)
     response.encoding = response.apparent_encoding
-    return BeautifulSoup(response.text, "lxml").get_text(strip=True)
+    text = BeautifulSoup(response.text, "lxml").get_text(separator=" ", strip=True)
+    clean_text = re.sub(r"[^가-힣\s]", "", text)  # 한글과 공백만 남기기
+    return clean_text
+
+
+def keword_preprocessing(text: str) -> list[tuple[str, int]]:
+    okt = Okt()
+
+    okt_pos = okt.pos(text, norm=True, stem=True)
+
+    # fmt: off
+    str_preprocessing = list(filter(lambda data: data if data[1] in "Noun" else None, okt_pos))
+    word_collect = [i[0] for i in str_preprocessing if len(i[0]) > 1]
+    word_count = Counter(word_collect).most_common(3)
+    return word_count
 
 
 class DatabaseHandler:
@@ -86,6 +106,7 @@ class DatabaseHandler:
                 "url",
                 "title",
                 "content",
+                "keyword",
                 "created_at",
                 "updated_at",
             )
@@ -94,6 +115,7 @@ class DatabaseHandler:
                 data.get("link"),
                 data.get("title"),
                 data.get("content"),
+                json.dumps(data.get("keyword"), ensure_ascii=False),
                 data.get("date"),
                 datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             )
@@ -125,6 +147,7 @@ class DatabaseHandler:
 
         if len(result) > 0:
             # 레코드가 존재할 경우 삭제 작업을 수행
+            logger.info("데이터 삭제합니다")
             delete_query = f"DELETE FROM dash.{table} WHERE id=%s"
             self.mysql_hook.run(delete_query, parameters=(id,))
 
@@ -149,7 +172,7 @@ class URLClassifier:
             if excutor:
                 process(result)
             else:
-                print("넘어갑니다")
+                logger.info("넘어갑니다")
         else:
             return result
 
@@ -170,24 +193,28 @@ class URLClassifier:
                     - 'not_ready_status'로 저장.
         """
         try:
-
             link: str | None = result.get("link")
             req: str | dict[str, int] | dict[str, str] = (
                 await ARAH.async_request_status(link)
             )
+
             result["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             match type(req):
                 case builtins.str:
                     content: str = fetch_content(link)
                     result["content"] = content
+                    result["keyword"] = keword_preprocessing(result["content"])
+                    logger.info("다음과 같은 이유로 추가 진행합니다 ", req)
                     return await self.data_checking(
                         result=result,
                         retry=retry,
                         delete_table="not_request_url",
                         process=self.db_handler.insert_ready_status,
                     )
+
                 case builtins.dict:
                     result["status"] = req["status"]
+                    logger.info("다음과 같은 이유로 삭제 진행합니다 ", req)
                     return await self.data_checking(
                         result=result,
                         retry=retry,
@@ -197,10 +224,14 @@ class URLClassifier:
 
         except (
             requests.exceptions.RequestException,
-            ClientConnectorSSLError,
-            ServerDisconnectedError,
-            ClientOSError,
             requests.exceptions.InvalidURL,
+            requests.exceptions.Timeout,
+            ClientConnectorSSLError,
+            ClientOSError,
+            ServerDisconnectedError,
+            ServerTimeoutError,
+            TimeoutError,
+            InvalidURL,
         ) as e:
             logger.error(f"Error occurred during request handling: {e}")
             result["status"] = 500
@@ -247,21 +278,25 @@ class Pipeline:
         for data in urls:
             self.db_handler.insert_total_url(data)
 
-    async def process_url(self, url: list[list[dict]], class_func: Callable) -> Any:
+    # fmt: off
+    async def process_url(self, url: list, func: Callable) -> Any:
         """URL을 처리하여 비동기적으로 요청
 
         Args:
-            url (list[list[dict]]): 처리할 URL 목록
-            class_func (Callable): URL을 처리할 함수
+            url (list): 처리할 URL 목록
+            func (Callable): URL을 처리할 함수
         """
         match type(url[0]):
             case builtins.tuple:
                 tasks: list[dict[str, str]] = [
-                    class_func(json.loads(*url[0][i])) for i in range(len(url[0]))
+                    func(json.loads(*url[0][i])) for i in range(len(url[0]))
                 ]
                 return await asyncio.gather(*tasks, return_exceptions=True)
             case builtins.list:
-                tasks = [class_func(item) for sublist in url for item in sublist]
+                if isinstance(url[0][0], list):
+                    tasks = list(map(lambda item: func(item), chain.from_iterable(*url)))
+                else:
+                    tasks = list(map(lambda item: func(item), chain(*url)))
                 return await asyncio.gather(*tasks, return_exceptions=True)
 
     async def retry_status_classifcation(self, **context: dict[str, Any]) -> None:

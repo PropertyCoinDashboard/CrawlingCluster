@@ -16,3 +16,5 @@ apache-airflow
 apache-airflow-providers-mysql
 undetected_chromedriver
 fake_useragent
+konlpy
+JPype1

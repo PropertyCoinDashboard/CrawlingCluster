@@ -1,5 +1,4 @@
 from parsing.util.search import AsyncWebCrawler
-import asyncio
 
 
 def data_list_change(**context) -> list[str]:

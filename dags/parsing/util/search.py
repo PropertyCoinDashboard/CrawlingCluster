@@ -1,3 +1,4 @@
+import re
 import asyncio
 import aiohttp
 from datetime import datetime
@@ -30,11 +31,14 @@ class AsyncRequestAcquisitionHTML:
         Returns:
             str | dict: HTML 또는 JSON 데이터
         """
-        match response_type:
-            case "html":
-                return await response.text()
-            case "json":
-                return await response.json()
+        try:
+            match response_type:
+                case "html":
+                    return await response.text("utf-8")
+                case "json":
+                    return await response.json()
+        except UnicodeDecodeError:
+            pass
 
     async def async_request(
         self, response: aiohttp.ClientResponse
@@ -76,7 +80,8 @@ class AsyncRequestAcquisitionHTML:
         Returns:
             str | dict[str, int] | dict[str, str] : 요청 결과 URL 또는 상태 코드
         """
-        async with aiohttp.ClientSession() as session:
+        timeout = aiohttp.ClientTimeout(total=10)  # 10초의 시간 제한 설정
+        async with aiohttp.ClientSession(timeout=timeout) as session:
             return await AsyncRequestAcquisitionHTML(session, url).async_type(type_="request")
 
     @staticmethod
@@ -97,7 +102,8 @@ class AsyncRequestAcquisitionHTML:
         Returns:
             str | dict: HTML 또는 JSON 데이터
         """
-        async with aiohttp.ClientSession() as session:
+        timeout = aiohttp.ClientTimeout(total=10)  # 10초의 시간 제한 설정
+        async with aiohttp.ClientSession(timeout=timeout) as session:
             return await AsyncRequestAcquisitionHTML(
                     session, url, params, headers
                 ).async_type(type_="source", source=response_type)
@@ -113,18 +119,16 @@ class AsyncWebCrawler:
         self.url_queue.put_nowait((start_url, 0))  # Put start URL with depth 0
         self.results = {}
 
-    def parse_links(
-        self, content: str, base_url: str
-    ) -> tuple[set, list[dict[str, str]]]:
+    # fmt: off
+    def parse_links(self, content: str, base_url: str) -> tuple[set, list[dict[str, str]]]:
         soup = BeautifulSoup(content, "lxml")
         links = set()
         data_list: list[dict[str, str]] = []
 
         for a_tag in soup.find_all("a", href=True):
             link: str = a_tag["href"]
-
             # 자바스크립트 링크 제외
-            if link.startswith("javascript:"):
+            if link.startswith(("javascript:", "#", "-", "i")) or "index.html" in link:
                 continue
 
             if link.startswith("/"):
