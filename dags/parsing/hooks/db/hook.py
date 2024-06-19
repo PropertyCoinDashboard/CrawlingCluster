@@ -1,4 +1,3 @@
-import re
 import json
 import builtins
 import logging
@@ -14,6 +13,7 @@ import requests
 from bs4 import BeautifulSoup
 import aiohttp
 
+from parsing.hooks.db.data_hook import KeywordExtractor
 from airflow.providers.mysql.hooks.mysql import MySqlHook
 from parsing.util.search import AsyncRequestAcquisitionHTML as ARAH
 from MySQLdb._exceptions import DatabaseError, DataError
@@ -34,8 +34,7 @@ def fetch_content(link: str) -> str:
     response = requests.get(link)
     response.encoding = response.apparent_encoding
     text = BeautifulSoup(response.text, "lxml").get_text(separator=" ", strip=True)
-    clean_text = re.sub(r"[^가-힣\s]", "", text)  # 한글과 공백만 남기기
-    return clean_text
+    return text
 
 
 def keword_preprocessing(text: str) -> list[tuple[str, int]]:
@@ -46,7 +45,7 @@ def keword_preprocessing(text: str) -> list[tuple[str, int]]:
     # fmt: off
     str_preprocessing = list(filter(lambda data: data if data[1] in "Noun" else None, okt_pos))
     word_collect = [i[0] for i in str_preprocessing if len(i[0]) > 1]
-    word_count = Counter(word_collect).most_common(3)
+    word_count = Counter(word_collect).most_common(1)
     return word_count
 
 
@@ -102,6 +101,7 @@ class DatabaseHandler:
                 "title",
                 "content",
                 "keyword",
+                "score",
                 "created_at",
                 "updated_at",
             )
@@ -111,6 +111,7 @@ class DatabaseHandler:
                 data.get("title"),
                 data.get("content"),
                 json.dumps(data.get("keyword"), ensure_ascii=False),
+                data.get("score"),
                 data.get("date"),
                 datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             )
@@ -128,7 +129,7 @@ class DatabaseHandler:
         for url in urls:
             self.mysql_hook.run(query, parameters=(url["link"], url["date"]))
 
-    def delete_from_database(self, table: str, id: int) -> bool:
+    def delete_from_database(self, table: str, url: str) -> bool:
         """
         주어진 id와 테이블명에 해당하는 레코드를 MySQL 데이터베이스에서 삭제합니다 (레코드가 존재할 경우에만).
 
@@ -137,13 +138,13 @@ class DatabaseHandler:
             id (int): 삭제할 레코드의 id
         """
         # 삭제 전에 레코드가 존재하는지 확인
-        select_query = f"SELECT 1 FROM dash.{table} WHERE id=%s"
-        result = self.mysql_hook.get_records(select_query, parameters=(id,))
+        select_query = f"SELECT url FROM dash.{table} WHERE url=%s"
+        result = self.mysql_hook.get_records(select_query, parameters=(url,))
 
         if len(result) > 0:
             # 레코드가 존재할 경우 삭제 작업을 수행
             logger.info("데이터 삭제합니다")
-            delete_query = f"DELETE FROM dash.{table} WHERE id=%s"
+            delete_query = f"DELETE FROM dash.{table} WHERE url=%s"
             self.mysql_hook.run(delete_query, parameters=(id,))
 
             return True
@@ -162,7 +163,7 @@ class URLClassifier:
     ) -> dict[str, str] | None:
         if retry:
             excutor: bool | None = self.db_handler.delete_from_database(
-                table=delete_table, id=result.get("id")
+                table=delete_table, id=result.get("url")
             )
             if excutor:
                 process(result)
@@ -197,7 +198,13 @@ class URLClassifier:
                 case builtins.str:
                     content: str = fetch_content(link)
                     result["content"] = content
-                    result["keyword"] = keword_preprocessing(result["content"])
+                    result["keyword"] = keword_preprocessing(content)
+                    result["score"] = KeywordExtractor(
+                        url=result["link"],
+                        text=result["content"],
+                        keyword=result["keyword"],
+                        present_time_str=result["date"],
+                    ).calculate_target()
                     return await self.data_checking(
                         result=result,
                         retry=retry,
@@ -214,17 +221,7 @@ class URLClassifier:
                         process=self.db_handler.insert_not_ready_status,
                     )
 
-        except (
-            requests.exceptions.RequestException,
-            requests.exceptions.InvalidURL,
-            requests.exceptions.Timeout,
-            aiohttp.ClientConnectorSSLError,
-            aiohttp.ServerDisconnectedError,
-            aiohttp.ClientOSError,
-            aiohttp.InvalidURL,
-            aiohttp.ServerTimeoutError,
-            TimeoutError,
-        ) as e:
+        except Exception as e:
             logger.error(f"Error occurred during request handling: {e}")
             result["status"] = 500
             result["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -286,13 +283,13 @@ class Pipeline:
                 tasks: list[dict[str, str]] = [
                     func(json.loads(*url[0][i])) for i in range(len(url[0]))
                 ]
-                return await asyncio.gather(*tasks, return_exceptions=True)
+                return await asyncio.gather(*tasks, return_exceptions=False)
             case builtins.list:
                 if isinstance(url[0][0], list):
                     tasks = lambda_process(chain.from_iterable(*url))
                 else:
                     tasks = lambda_process(chain(*url))
-                return await asyncio.gather(*tasks, return_exceptions=True)
+                return await asyncio.gather(*tasks, return_exceptions=False)
 
     async def retry_status_classifcation(self, **context: dict[str, Any]) -> None:
         """재시도를 통해 URL 상태를 분류

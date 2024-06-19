@@ -1,8 +1,11 @@
-from parsing.util.search import AsyncWebCrawler
-from konlpy.tag import Okt
-from collections import Counter
 import csv
+import pytz
 import time
+from collections import Counter
+from datetime import datetime
+
+from konlpy.tag import Okt
+from parsing.util.search import AsyncWebCrawler
 from airflow.providers.amazon.aws.hooks.s3 import S3Hook
 from airflow.providers.mysql.hooks.mysql import MySqlHook
 
@@ -59,3 +62,93 @@ def extract_mysql_data_to_s3() -> None:
     s3_hook.load_file(
         filename=localfile_name, key=out_file_name, bucket_name=bucket_name
     )
+
+
+class KeywordExtractor:
+    def __init__(
+        self,
+        url: str,
+        text: str,
+        keyword: list[tuple[str, int]],
+        present_time_str: datetime,
+    ) -> None:
+        self.url = url
+        self.text = text
+        self.keyword = keyword
+        self.cleaned_text = self._clean_text()
+        self.present_time = present_time_str
+        self.okt = Okt()
+
+    def _clean_text(self) -> list[str]:
+        sentences = self.text.split(".")
+        return [sentence for sentence in sentences if len(sentence) > 30]
+
+    def _join_sentences(self, sentences: list[str]) -> str:
+        return " ".join(sentences)
+
+    def __len__(self) -> int:
+        return len(self._join_sentences(self.cleaned_text))
+
+    def calculate_frequencies(self) -> list[tuple[str, float]]:
+        keywords = self.keyword
+        total_sentences = len(self.cleaned_text)
+        frequencies = [
+            (keyword, round((count / total_sentences), 2))
+            for keyword, count in keywords
+        ]
+        return frequencies
+
+    def time_cal(self) -> int:
+        present_time_str = self.present_time.replace(": ", " ")
+        present_date = datetime.strptime(present_time_str, "%Y-%m-%d %H:%M:%S")
+        present_date = int(present_date.strftime("%Y%m%d"))
+        return present_date
+
+    def calculate_target(self) -> float:
+        present_time = datetime.now(pytz.timezone("Asia/Seoul")).date()
+        present_time_int = int(present_time.strftime("%Y%m%d"))
+
+        new_time = self.time_cal()
+
+        def target_score(freq_value: str, target: float) -> float:
+            if freq_value in ["비트코인", "비트", "코인", "리플"]:
+                target += 0.4
+            elif freq_value in ["채굴", "화폐", "가상화폐", "달러"]:
+                target += 0.2
+            else:
+                target -= 0.2
+            return target
+
+        target = 0.4  # 기본 점수 설정을 낮춤
+        for frequency in self.calculate_frequencies():
+            freq_value = frequency
+
+            if isinstance(freq_value[1], float):
+                if self.__len__() > 5300 and freq_value[1] >= 0.35:
+                    target = target_score(freq_value[0], target)
+                elif self.__len__() > 4500 and freq_value[1] >= 0.35:
+                    target = target_score(freq_value[0], target)
+                elif self.__len__() > 3500 and freq_value[1] >= 0.45:
+                    target = target_score(freq_value[0], target)
+                elif self.__len__() > 2300 and freq_value[1] >= 0.5:
+                    target = target_score(freq_value[0], target)
+
+        if present_time_int == new_time:
+            target += 0
+        elif present_time_int - new_time == 2:
+            target -= -0.1
+        elif present_time_int - new_time == 3:
+            target -= -0.2
+        elif present_time_int - new_time == 4:
+            target -= -0.3
+        else:
+            target += 0
+
+        # 최대 1점을 넘지 않도록 조정
+        if target > 1.0:
+            target = 1.0
+        if target <= 0:
+            target = 0
+            return target
+
+        return round(target, 2)

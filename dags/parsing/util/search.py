@@ -131,7 +131,7 @@ class AsyncWebCrawler:
                 continue
 
             if link.startswith("/"):
-                link = url_addition(base_url, link)
+                link: str = url_addition(base_url, link)
             if link.startswith("http"):
                 links.add(link)
 

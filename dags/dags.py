@@ -4,11 +4,9 @@ from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.bash import BashOperator
 from airflow.operators.python import PythonOperator
+from airflow.utils.task_group import TaskGroup
 from airflow.sensors.external_task import ExternalTaskSensor
 from airflow.providers.mysql.operators.mysql import MySqlOperator
-from airflow.utils.task_group import TaskGroup
-from airflow.providers.amazon.aws.operators.s3 import S3CreateBucketOperator
-from airflow.providers.amazon.aws.sensors.s3 import S3KeySensor
 from parsing.drive.naver_parsing_api import NaverNewsParsingDriver
 from parsing.operators.crawling import CrawlingOperator
 from parsing.hooks.db.hook import DatabaseHandler, Pipeline
@@ -16,7 +14,6 @@ from parsing.hooks.db.data_hook import (
     data_list_change,
     deep_crawling_run,
     preprocessing,
-    extract_mysql_data_to_s3,
 )
 
 
@@ -132,49 +129,9 @@ with DAG(
         task_id="saving", python_callable=first_data_saving_task, dag=dag
     )
 
-    create_bucket = S3CreateBucketOperator(
-        task_id="s3_bucket_dag_create",
-        bucket_name=None,
-        aws_conn_id="your_aws_connection_id",
-        dag=dag,
-    )
-
-    log_saving = PythonOperator(
-        task_id="log_saving", python_callable=extract_mysql_data_to_s3, dag=dag
-    )
-
     status_tasks = create_status_task("status_tasks", dag, pipeline)
 
-    # create_bucket_task = S3CreateBucketOperator(
-    #     task_id="create_s3_bucket",
-    #     bucket_name=s3_bucket_name,
-    #     region_name=aws_region_name,
-    #     aws_conn_id="aws_default",
-    #     create_bucket_config={"LocationConstraint": aws_region_name},
-    #     enforce_s3_bucket="no_exists",
-    #     dag=dag,
-    # )
-
-    # wait_for_s3_key_task = S3KeySensor(
-    #     task_id="wait_for_s3_key",
-    #     bucket_name=s3_bucket_name,
-    #     bucket_key=s3_key,
-    #     wildcard_match=False,
-    #     timeout=600,
-    #     poke_interval=30,
-    #     aws_conn_id="aws_default",
-    #     dag=dag,
-    # )
-
-    (
-        response
-        >> wait_for_api_response
-        >> start_operator
-        >> naver
-        >> saving
-        # >> create_bucket_task
-        # >> wait_for_s3_key_task
-    )
+    (response >> wait_for_api_response >> start_operator >> naver >> saving)
     naver >> status_tasks
 
 
