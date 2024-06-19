@@ -3,23 +3,18 @@ import json
 import builtins
 import logging
 import asyncio
-from typing import Any, Union, Callable
+from datetime import datetime
 from itertools import chain
 from collections import Counter
-from datetime import datetime
+from typing import Any, Union, Callable
+
 from konlpy.tag import Okt
 
 import requests
 from bs4 import BeautifulSoup
+import aiohttp
 
 from airflow.providers.mysql.hooks.mysql import MySqlHook
-from aiohttp.client_exceptions import (
-    ClientConnectorSSLError,
-    ServerDisconnectedError,
-    ClientOSError,
-    InvalidURL,
-)
-from aiohttp.client_exceptions import ServerTimeoutError
 from parsing.util.search import AsyncRequestAcquisitionHTML as ARAH
 from MySQLdb._exceptions import DatabaseError, DataError
 
@@ -197,14 +192,12 @@ class URLClassifier:
             req: str | dict[str, int] | dict[str, str] = (
                 await ARAH.async_request_status(link)
             )
-
             result["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             match type(req):
                 case builtins.str:
                     content: str = fetch_content(link)
                     result["content"] = content
                     result["keyword"] = keword_preprocessing(result["content"])
-                    logger.info("다음과 같은 이유로 추가 진행합니다 ", req)
                     return await self.data_checking(
                         result=result,
                         retry=retry,
@@ -214,7 +207,6 @@ class URLClassifier:
 
                 case builtins.dict:
                     result["status"] = req["status"]
-                    logger.info("다음과 같은 이유로 삭제 진행합니다 ", req)
                     return await self.data_checking(
                         result=result,
                         retry=retry,
@@ -226,12 +218,12 @@ class URLClassifier:
             requests.exceptions.RequestException,
             requests.exceptions.InvalidURL,
             requests.exceptions.Timeout,
-            ClientConnectorSSLError,
-            ClientOSError,
-            ServerDisconnectedError,
-            ServerTimeoutError,
+            aiohttp.ClientConnectorSSLError,
+            aiohttp.ServerDisconnectedError,
+            aiohttp.ClientOSError,
+            aiohttp.InvalidURL,
+            aiohttp.ServerTimeoutError,
             TimeoutError,
-            InvalidURL,
         ) as e:
             logger.error(f"Error occurred during request handling: {e}")
             result["status"] = 500
@@ -286,6 +278,9 @@ class Pipeline:
             url (list): 처리할 URL 목록
             func (Callable): URL을 처리할 함수
         """
+        def lambda_process(process: chain) -> list:
+            return list(map(lambda item: func(item), process))
+        
         match type(url[0]):
             case builtins.tuple:
                 tasks: list[dict[str, str]] = [
@@ -294,9 +289,9 @@ class Pipeline:
                 return await asyncio.gather(*tasks, return_exceptions=True)
             case builtins.list:
                 if isinstance(url[0][0], list):
-                    tasks = list(map(lambda item: func(item), chain.from_iterable(*url)))
+                    tasks = lambda_process(chain.from_iterable(*url))
                 else:
-                    tasks = list(map(lambda item: func(item), chain(*url)))
+                    tasks = lambda_process(chain(*url))
                 return await asyncio.gather(*tasks, return_exceptions=True)
 
     async def retry_status_classifcation(self, **context: dict[str, Any]) -> None:

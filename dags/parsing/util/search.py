@@ -80,8 +80,7 @@ class AsyncRequestAcquisitionHTML:
         Returns:
             str | dict[str, int] | dict[str, str] : 요청 결과 URL 또는 상태 코드
         """
-        timeout = aiohttp.ClientTimeout(total=10)  # 10초의 시간 제한 설정
-        async with aiohttp.ClientSession(timeout=timeout) as session:
+        async with aiohttp.ClientSession() as session:
             return await AsyncRequestAcquisitionHTML(session, url).async_type(type_="request")
 
     @staticmethod
@@ -102,7 +101,7 @@ class AsyncRequestAcquisitionHTML:
         Returns:
             str | dict: HTML 또는 JSON 데이터
         """
-        timeout = aiohttp.ClientTimeout(total=10)  # 10초의 시간 제한 설정
+        timeout = aiohttp.ClientTimeout(total=20)  # 10초의 시간 제한 설정
         async with aiohttp.ClientSession(timeout=timeout) as session:
             return await AsyncRequestAcquisitionHTML(
                     session, url, params, headers

@@ -6,7 +6,9 @@ from airflow.operators.bash import BashOperator
 from airflow.operators.python import PythonOperator
 from airflow.sensors.external_task import ExternalTaskSensor
 from airflow.providers.mysql.operators.mysql import MySqlOperator
-
+from airflow.utils.task_group import TaskGroup
+from airflow.providers.amazon.aws.operators.s3 import S3CreateBucketOperator
+from airflow.providers.amazon.aws.sensors.s3 import S3KeySensor
 from parsing.drive.naver_parsing_api import NaverNewsParsingDriver
 from parsing.operators.crawling import CrawlingOperator
 from parsing.hooks.db.hook import DatabaseHandler, Pipeline
@@ -14,6 +16,7 @@ from parsing.hooks.db.data_hook import (
     data_list_change,
     deep_crawling_run,
     preprocessing,
+    extract_mysql_data_to_s3,
 )
 
 
@@ -21,8 +24,8 @@ db_handler = DatabaseHandler()
 pipeline = Pipeline(db_handler)
 
 
-def response_html() -> dict[str, bool]:
-    data = NaverNewsParsingDriver("BTC", 10).fetch_page_urls()
+def response_html(search_keyword: str, count: int) -> dict[str, bool]:
+    data = NaverNewsParsingDriver(search_keyword, count).fetch_page_urls()
     loop = asyncio.get_event_loop()
     play = loop.run_until_complete(data)
 
@@ -44,6 +47,35 @@ def async_process_injection(**context) -> list:
         asyncio.run(context["process"](**context))
 
 
+def create_status_task(task_group_name: str, dag: DAG, pipeline: Pipeline) -> TaskGroup:
+    with TaskGroup(task_group_name, dag=dag) as group:
+        status_requesting = PythonOperator(
+            task_id="classifier",
+            python_callable=async_process_injection,
+            op_kwargs={"process": pipeline.aiorequest_classification},
+            dag=dag,
+        )
+
+        not_request = PythonOperator(
+            task_id="not_request",
+            python_callable=async_process_injection,
+            op_kwargs={"process": pipeline.not_request_saving},
+            dag=dag,
+        )
+
+        request_200 = PythonOperator(
+            task_id="200_request",
+            python_callable=async_process_injection,
+            op_kwargs={"process": pipeline.request_saving},
+            dag=dag,
+        )
+
+        status_requesting >> not_request
+        status_requesting >> request_200
+
+    return group
+
+
 default_args = {
     "owner": "airflow",
     "depends_on_past": False,
@@ -59,7 +91,7 @@ default_args = {
 with DAG(
     dag_id="Crawling_data_API",
     default_args=default_args,
-    schedule_interval=timedelta(minutes=10),
+    # schedule_interval=timedelta(minutes=10),
     catchup=False,
     tags=["네이버 크롤링"],
 ) as dag:
@@ -67,7 +99,8 @@ with DAG(
     response = PythonOperator(
         task_id="api_call_task",
         python_callable=response_html,
-        provide_context=True,
+        op_kwargs={"search_keyword": "BTC", "count": 10},
+        dag=dag,
     )
 
     wait_for_api_response = ExternalTaskSensor(
@@ -78,10 +111,13 @@ with DAG(
         poke_interval=60,
         timeout=600,
         retries=3,
+        dag=dag,
     )
 
     start_operator = BashOperator(
-        task_id="News_API_start", bash_command="echo crawling start!!"
+        task_id="News_API_start",
+        bash_command="echo crawling start!!",
+        dag=dag,
     )
 
     naver = CrawlingOperator(
@@ -89,29 +125,6 @@ with DAG(
         count=10,
         target="BTC",
         site="naver",
-    )
-
-    status_requesting = PythonOperator(
-        task_id="classifier",
-        python_callable=async_process_injection,
-        op_kwargs={"process": pipeline.aiorequest_classification},
-        provide_context=True,
-        dag=dag,
-    )
-
-    not_request = PythonOperator(
-        task_id="not_request",
-        python_callable=async_process_injection,
-        op_kwargs={"process": pipeline.not_request_saving},
-        provide_context=True,
-        dag=dag,
-    )
-
-    request_200 = PythonOperator(
-        task_id="200_request",
-        python_callable=async_process_injection,
-        op_kwargs={"process": pipeline.request_saving},
-        provide_context=True,
         dag=dag,
     )
 
@@ -119,9 +132,51 @@ with DAG(
         task_id="saving", python_callable=first_data_saving_task, dag=dag
     )
 
-    response >> wait_for_api_response >> start_operator >> naver >> saving
-    naver >> status_requesting >> not_request
-    naver >> status_requesting >> request_200
+    create_bucket = S3CreateBucketOperator(
+        task_id="s3_bucket_dag_create",
+        bucket_name=None,
+        aws_conn_id="your_aws_connection_id",
+        dag=dag,
+    )
+
+    log_saving = PythonOperator(
+        task_id="log_saving", python_callable=extract_mysql_data_to_s3, dag=dag
+    )
+
+    status_tasks = create_status_task("status_tasks", dag, pipeline)
+
+    # create_bucket_task = S3CreateBucketOperator(
+    #     task_id="create_s3_bucket",
+    #     bucket_name=s3_bucket_name,
+    #     region_name=aws_region_name,
+    #     aws_conn_id="aws_default",
+    #     create_bucket_config={"LocationConstraint": aws_region_name},
+    #     enforce_s3_bucket="no_exists",
+    #     dag=dag,
+    # )
+
+    # wait_for_s3_key_task = S3KeySensor(
+    #     task_id="wait_for_s3_key",
+    #     bucket_name=s3_bucket_name,
+    #     bucket_key=s3_key,
+    #     wildcard_match=False,
+    #     timeout=600,
+    #     poke_interval=30,
+    #     aws_conn_id="aws_default",
+    #     dag=dag,
+    # )
+
+    (
+        response
+        >> wait_for_api_response
+        >> start_operator
+        >> naver
+        >> saving
+        # >> create_bucket_task
+        # >> wait_for_s3_key_task
+    )
+    naver >> status_tasks
+
 
 with DAG(
     dag_id="deep_data_API",
@@ -141,54 +196,24 @@ with DAG(
     hooking = PythonOperator(
         task_id="list_change",
         python_callable=data_list_change,
-        provide_context=True,
         dag=dag,
     )
     th = PythonOperator(
         task_id="async_change",
         python_callable=async_process_injection,
         op_kwargs={"process": deep_crawling_run},
-        provide_context=True,
         dag=dag,
     )
 
     prepro = PythonOperator(
-        task_id="dddd", python_callable=preprocessing, provide_context=True, dag=dag
-    )
-
-    status_requesting = PythonOperator(
-        task_id="deep_classifier",
-        python_callable=async_process_injection,
-        op_kwargs={"process": pipeline.aiorequest_classification},
-        provide_context=True,
+        task_id="preprocess",
+        python_callable=preprocessing,
         dag=dag,
     )
 
-    not_request = PythonOperator(
-        task_id="dee_not_request",
-        python_callable=async_process_injection,
-        op_kwargs={"process": pipeline.not_request_saving},
-        provide_context=True,
-        dag=dag,
-    )
+    status_tasks = create_status_task("deep_status_tasks", dag, pipeline)
 
-    request_200 = PythonOperator(
-        task_id="deee200_request",
-        python_callable=async_process_injection,
-        op_kwargs={"process": pipeline.request_saving},
-        provide_context=True,
-        dag=dag,
-    )
-
-    (
-        url_selection
-        >> hooking
-        >> th
-        >> prepro
-        >> status_requesting
-        >> not_request
-        >> request_200
-    )
+    url_selection >> hooking >> th >> prepro >> status_tasks
 
 
 def create_url_status_dag(dag_id, query_table) -> DAG:
@@ -220,7 +245,6 @@ def create_url_status_dag(dag_id, query_table) -> DAG:
             task_id="process_url_data",
             python_callable=async_process_injection,
             op_kwargs={"process": pipeline.retry_status_classifcation},
-            provide_context=True,
             dag=dag,
         )
 

@@ -2,7 +2,6 @@ import time
 import random
 import urllib3
 
-
 from typing import Any, Callable
 from urllib3 import exceptions
 from collections import deque
@@ -10,6 +9,7 @@ from collections import deque
 import undetected_chromedriver as uc
 from selenium import webdriver
 from selenium.webdriver.common.by import By
+from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.common.exceptions import (
@@ -17,7 +17,6 @@ from selenium.common.exceptions import (
     NoSuchElementException,
     WebDriverException,
 )
-from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 
 from fake_useragent import UserAgent
 
@@ -41,12 +40,12 @@ ua = UserAgent()
 def chrome_option_injection() -> webdriver.Chrome:
     # 크롬 옵션 설정
     option_chrome = uc.ChromeOptions()
-    # option_chrome.add_argument("headless")
-    # option_chrome.add_argument("--disable-gpu")
-    # option_chrome.add_argument("--disable-infobars")
-    # option_chrome.add_argument("--disable-extensions")
-    # option_chrome.add_argument("--no-sandbox")
-    # option_chrome.add_argument("--disable-dev-shm-usage")
+    option_chrome.add_argument("headless")
+    option_chrome.add_argument("--disable-gpu")
+    option_chrome.add_argument("--disable-infobars")
+    option_chrome.add_argument("--disable-extensions")
+    option_chrome.add_argument("--no-sandbox")
+    option_chrome.add_argument("--disable-dev-shm-usage")
     option_chrome.add_argument(f"user-agent={ua.random}")
 
     caps = DesiredCapabilities().CHROME
