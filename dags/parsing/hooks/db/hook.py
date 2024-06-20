@@ -198,10 +198,21 @@ class URLClassifier:
             result["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             match type(req):
                 case builtins.str:
-                    return result
+                    return await self.data_checking(
+                        result=result,
+                        retry=retry,
+                        delete_table="request_url",
+                        process=self.db_handler.insert_not_ready_status,
+                    )
+
                 case builtins.dict:
                     result["status"] = req["status"]
-                    return result
+                    return await self.data_checking(
+                        result=result,
+                        retry=retry,
+                        delete_table="request_url",
+                        process=self.db_handler.insert_not_ready_status,
+                    )
 
         except Exception as e:
             logger.error(f"Error occurred during request handling: {e}")
