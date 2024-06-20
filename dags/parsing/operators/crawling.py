@@ -10,6 +10,8 @@ from parsing.protocol import CrawlingProcess
 class CrawlingOperator(BaseOperator):
     """크롤링 operator"""
 
+    template_fields = ("count", "target")
+
     @apply_defaults
     def __init__(self, count: int, target: str, site: str, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
@@ -18,6 +20,7 @@ class CrawlingOperator(BaseOperator):
         self.site = site
 
     async def naver_again(self) -> UrlCollect:
+        print(self.target, self.count)
         return await CrawlingProcess(self.target, self.count).process_naver()
 
     # fmt: off

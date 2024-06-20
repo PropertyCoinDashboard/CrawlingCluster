@@ -22,7 +22,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def fetch_content(link: str) -> str:
+async def fetch_content(link: str) -> str:
     """주어진 URL에서 콘텐츠를 가져오기
 
     Args:
@@ -31,10 +31,12 @@ def fetch_content(link: str) -> str:
     Returns:
         str: 가져온 콘텐츠를 문자열 형태로 반환.
     """
-    response = requests.get(link)
-    response.encoding = response.apparent_encoding
-    text = BeautifulSoup(response.text, "lxml").get_text(separator=" ", strip=True)
-    return text
+    try:
+        response: str = await ARAH.async_fetch_content(response_type="html", url=link)
+        text: str = BeautifulSoup(response, "lxml").get_text(separator=" ", strip=True)
+        return text
+    except TypeError:
+        return ""
 
 
 def keword_preprocessing(text: str) -> list[tuple[str, int]]:
@@ -196,30 +198,10 @@ class URLClassifier:
             result["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             match type(req):
                 case builtins.str:
-                    content: str = fetch_content(link)
-                    result["content"] = content
-                    result["keyword"] = keword_preprocessing(content)
-                    result["score"] = KeywordExtractor(
-                        url=result["link"],
-                        text=result["content"],
-                        keyword=result["keyword"],
-                        present_time_str=result["date"],
-                    ).calculate_target()
-                    return await self.data_checking(
-                        result=result,
-                        retry=retry,
-                        delete_table="not_request_url",
-                        process=self.db_handler.insert_ready_status,
-                    )
-
+                    return result
                 case builtins.dict:
                     result["status"] = req["status"]
-                    return await self.data_checking(
-                        result=result,
-                        retry=retry,
-                        delete_table="request_url",
-                        process=self.db_handler.insert_not_ready_status,
-                    )
+                    return result
 
         except Exception as e:
             logger.error(f"Error occurred during request handling: {e}")
@@ -291,6 +273,25 @@ class Pipeline:
                     tasks = lambda_process(chain(*url))
                 return await asyncio.gather(*tasks, return_exceptions=False)
 
+    async def _context_extract(self, result: dict) -> dict[str, Union[int, str, float]]:
+        result["status"] = 200
+        result["content"] = await fetch_content(result["link"])
+        result["keyword"] = keword_preprocessing(result["content"])
+        result["score"] = KeywordExtractor(
+            url=result["link"],
+            text=result["content"],
+            keyword=result["keyword"],
+            present_time_str=result["date"],
+        ).calculate_target()
+        return result
+    
+    async def request_transfor(self, **context) -> None:
+        urls = context["ti"].xcom_pull(key="request_url")
+        tasks = list(map(lambda data: self._context_extract(result=data), urls))
+        result: list[dict[str, str]] = await asyncio.gather(*tasks, return_exceptions=False)
+        
+        context["ti"].xcom_push(key="request_extraction", value=result)
+
     async def retry_status_classifcation(self, **context: dict[str, Any]) -> None:
         """재시도를 통해 URL 상태를 분류
 
@@ -346,5 +347,5 @@ class Pipeline:
         Args:
             **context (dict[str, Any]): 태스크 컨텍스트
         """
-        urls = context["ti"].xcom_pull(key="request_url")
+        urls = context["ti"].xcom_pull(key="request_extraction")
         await self.saving_task(self.db_handler.insert_ready_status, urls)

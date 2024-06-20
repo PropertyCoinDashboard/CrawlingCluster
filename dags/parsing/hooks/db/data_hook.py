@@ -90,13 +90,17 @@ class KeywordExtractor:
         return len(self._join_sentences(self.cleaned_text))
 
     def calculate_frequencies(self) -> list[tuple[str, float]]:
-        keywords = self.keyword
-        total_sentences = len(self.cleaned_text)
-        frequencies = [
-            (keyword, round((count / total_sentences), 2))
-            for keyword, count in keywords
-        ]
-        return frequencies
+        try:
+            keywords = self.keyword
+            total_sentences = len(self.cleaned_text)
+            frequencies = [
+                (keyword, round((count / total_sentences), 2))
+                for keyword, count in keywords
+            ]
+            return frequencies
+        except ZeroDivisionError:
+            frequencies = 0
+            return frequencies
 
     def time_cal(self) -> int:
         present_time_str = self.present_time.replace(": ", " ")

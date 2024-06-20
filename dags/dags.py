@@ -1,9 +1,13 @@
+import random
+import string
 import asyncio
+from typing import Callable
 from datetime import datetime, timedelta
 
 from airflow import DAG
 from airflow.operators.bash import BashOperator
 from airflow.operators.python import PythonOperator
+from airflow.operators.trigger_dagrun import TriggerDagRunOperator
 from airflow.utils.task_group import TaskGroup
 from airflow.sensors.external_task import ExternalTaskSensor
 from airflow.providers.mysql.operators.mysql import MySqlOperator
@@ -27,7 +31,7 @@ def response_html(search_keyword: str, count: int) -> dict[str, bool]:
     play = loop.run_until_complete(data)
 
     if play[1] == True:
-        return {"check_fn": True}
+        return {"search_keyword": search_keyword, "count": count}
     else:
         return {"check_fn": False}
 
@@ -46,29 +50,26 @@ def async_process_injection(**context) -> list:
 
 def create_status_task(task_group_name: str, dag: DAG, pipeline: Pipeline) -> TaskGroup:
     with TaskGroup(task_group_name, dag=dag) as group:
-        status_requesting = PythonOperator(
-            task_id="classifier",
-            python_callable=async_process_injection,
-            op_kwargs={"process": pipeline.aiorequest_classification},
-            dag=dag,
+
+        def create_python_operator(task_id: str, python_callable: Callable):
+            return PythonOperator(
+                task_id=task_id,
+                python_callable=async_process_injection,
+                op_kwargs={"process": python_callable},
+                dag=dag,
+            )
+
+        # fmt: off
+        requesting = create_python_operator("classifier", pipeline.aiorequest_classification)
+        not_request = create_python_operator("not_request", pipeline.not_request_saving)
+        request_200 = create_python_operator("200_request", pipeline.request_saving)
+        request_extarct = create_python_operator(
+            "200_request_extarct", pipeline.request_transfor
         )
 
-        not_request = PythonOperator(
-            task_id="not_request",
-            python_callable=async_process_injection,
-            op_kwargs={"process": pipeline.not_request_saving},
-            dag=dag,
-        )
-
-        request_200 = PythonOperator(
-            task_id="200_request",
-            python_callable=async_process_injection,
-            op_kwargs={"process": pipeline.request_saving},
-            dag=dag,
-        )
-
-        status_requesting >> not_request
-        status_requesting >> request_200
+        # Define task dependencies
+        requesting >> not_request
+        requesting >> request_extarct >> request_200
 
     return group
 
@@ -88,7 +89,7 @@ default_args = {
 with DAG(
     dag_id="Crawling_data_API",
     default_args=default_args,
-    # schedule_interval=timedelta(minutes=10),
+    schedule_interval=timedelta(hours=12),
     catchup=False,
     tags=["네이버 크롤링"],
 ) as dag:
@@ -119,8 +120,8 @@ with DAG(
 
     naver = CrawlingOperator(
         task_id="naver_task",
-        count=10,
-        target="BTC",
+        count="{{ task_instance.xcom_pull(task_ids='api_call_task')['count'] }}",
+        target="{{ task_instance.xcom_pull(task_ids='api_call_task')['search_keyword'] }}",
         site="naver",
         dag=dag,
     )
@@ -129,10 +130,18 @@ with DAG(
         task_id="saving", python_callable=first_data_saving_task, dag=dag
     )
 
-    status_tasks = create_status_task("status_tasks", dag, pipeline)
+    status_tasks = create_status_task(
+        task_group_name="status_task", dag=dag, pipeline=pipeline
+    )
+
+    trigger_deep_data_api = TriggerDagRunOperator(
+        task_id="trigger_deep_data_api",
+        trigger_dag_id="deep_data_API",
+        dag=dag,
+    )
 
     (response >> wait_for_api_response >> start_operator >> naver >> saving)
-    naver >> status_tasks
+    naver >> status_tasks >> trigger_deep_data_api
 
 
 with DAG(
@@ -146,7 +155,7 @@ with DAG(
     url_selection = MySqlOperator(
         task_id="mysql_query",
         mysql_conn_id="airflow-mysql",
-        sql="SELECT url FROM dash.request_url;",
+        sql="SELECT url FROM dash.request_url",
         dag=dag,
     )
 
@@ -168,16 +177,18 @@ with DAG(
         dag=dag,
     )
 
-    status_tasks = create_status_task("deep_status_tasks", dag, pipeline)
+    status_tasks = create_status_task(
+        task_group_name="deep_status_task", dag=dag, pipeline=pipeline
+    )
 
-    url_selection >> hooking >> th >> prepro >> status_tasks
+    (url_selection >> hooking >> th >> prepro >> status_tasks)
 
 
 def create_url_status_dag(dag_id, query_table) -> DAG:
     with DAG(
         dag_id=dag_id,
         default_args=default_args,
-        schedule_interval=timedelta(minutes=10),
+        schedule_interval=timedelta(hours=6),
         catchup=False,
         tags=["URL status 분석"],
     ) as dag:
