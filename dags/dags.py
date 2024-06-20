@@ -1,9 +1,10 @@
 import asyncio
 from typing import Callable
+
+import pytz
 from datetime import datetime, timedelta
 
 from airflow import DAG
-from airflow.utils.dates import days_ago
 from airflow.operators.bash import BashOperator
 from airflow.operators.python import PythonOperator
 from airflow.operators.trigger_dagrun import TriggerDagRunOperator
@@ -75,7 +76,14 @@ def create_status_task(task_group_name: str, dag: DAG, pipeline: Pipeline) -> Ta
 
 now = datetime.now()
 next_run = now + timedelta(days=1)  # 다음 날로 넘어가기 위해 days=1 추가
-next_run = datetime(next_run.year, next_run.month, next_run.day, 8, 0)  # 아침 8시 설정
+next_run = datetime(
+    next_run.year,
+    next_run.month,
+    next_run.day,
+    hour=8,
+    minute=0,
+    tzinfo=pytz.timezone("Asia/Seoul"),
+)  # 아침 8시 설정
 
 default_args = {
     "owner": "airflow",
