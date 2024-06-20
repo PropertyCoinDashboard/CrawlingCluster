@@ -201,8 +201,8 @@ class URLClassifier:
                     return await self.data_checking(
                         result=result,
                         retry=retry,
-                        delete_table="request_url",
-                        process=self.db_handler.insert_not_ready_status,
+                        delete_table="not_request_url",
+                        process=self.db_handler.insert_ready_status,
                     )
 
                 case builtins.dict:
