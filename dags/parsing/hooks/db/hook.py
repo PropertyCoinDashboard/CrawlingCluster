@@ -163,20 +163,20 @@ class URLClassifier:
     async def data_checking(
         self, retry: bool, result: dict[str, str], delete_table: str, process: Callable
     ) -> dict[str, str] | None:
-        if retry:
-            excutor: bool | None = self.db_handler.delete_from_database(
-                table=delete_table, id=result.get("url")
-            )
-            if excutor:
-                if result.get("status") == 200:
-                    re_data = Pipeline(self.db_handler)._context_extract(result=result)
-                    process(re_data)
-                else:
-                    process(result)
-            else:
-                logger.info("넘어갑니다")
-        else:
+        if not retry:
             return result
+
+        excutor: bool = self.db_handler.delete_from_database(
+            table=delete_table, id=result.get("url")
+        )
+        if not excutor:
+            logger.info("넘어갑니다")
+
+        if result.get("status") == 200:
+            re_data = Pipeline(self.db_handler)._context_extract(result=result)
+            process(re_data)
+        else:
+            process(result)
 
     async def handle_async_request(
         self, result: dict[str, str], retry: bool | None
@@ -239,7 +239,7 @@ class URLClassifier:
     async def request_classify(
         self, result: dict[str, Union[str, int]]
     ) -> dict[str, str] | None:
-        """재시도를 통해 URL을 분류하고 데이터베이스에 넣기"""
+        """URL을 분류하고 데이터베이스에 넣기"""
         return await self.handle_async_request(result, retry=False)
 
 
