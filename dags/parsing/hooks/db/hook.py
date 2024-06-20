@@ -168,7 +168,11 @@ class URLClassifier:
                 table=delete_table, id=result.get("url")
             )
             if excutor:
-                process(result)
+                if result.get("status") == 200:
+                    re_data = Pipeline(self.db_handler)._context_extract(result=result)
+                    process(re_data)
+                else:
+                    process(result)
             else:
                 logger.info("넘어갑니다")
         else:
@@ -198,6 +202,7 @@ class URLClassifier:
             result["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             match type(req):
                 case builtins.str:
+                    result["status"] = 200
                     return await self.data_checking(
                         result=result,
                         retry=retry,
@@ -285,7 +290,6 @@ class Pipeline:
                 return await asyncio.gather(*tasks, return_exceptions=False)
 
     async def _context_extract(self, result: dict) -> dict[str, Union[int, str, float]]:
-        result["status"] = 200
         result["content"] = await fetch_content(result["link"])
         result["keyword"] = keword_preprocessing(result["content"])
         result["score"] = KeywordExtractor(
