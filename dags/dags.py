@@ -82,8 +82,9 @@ next_run = datetime(
     next_run.day,
     hour=8,
     minute=0,
-    tzinfo=pytz.timezone("Asia/Seoul"),
 )  # 아침 8시 설정
+next_run = pytz.utc.localize(next_run).astimezone(pytz.timezone("Asia/Seoul"))
+
 
 default_args = {
     "owner": "airflow",
