@@ -1,10 +1,9 @@
-import random
-import string
 import asyncio
 from typing import Callable
 from datetime import datetime, timedelta
 
 from airflow import DAG
+from airflow.utils.dates import days_ago
 from airflow.operators.bash import BashOperator
 from airflow.operators.python import PythonOperator
 from airflow.operators.trigger_dagrun import TriggerDagRunOperator
@@ -74,10 +73,14 @@ def create_status_task(task_group_name: str, dag: DAG, pipeline: Pipeline) -> Ta
     return group
 
 
+now = datetime.now()
+next_run = now + timedelta(days=1)  # 다음 날로 넘어가기 위해 days=1 추가
+next_run = datetime(next_run.year, next_run.month, next_run.day, 8, 0)  # 아침 8시 설정
+
 default_args = {
     "owner": "airflow",
     "depends_on_past": False,
-    "start_date": datetime(2024, 6, 10),
+    "start_date": next_run,
     "email": ["limhaneul12@naver.com"],
     "email_on_failure": False,
     "email_on_retry": False,
@@ -144,9 +147,18 @@ with DAG(
     naver >> status_tasks >> trigger_deep_data_api
 
 
+default_args2 = {
+    "owner": "airflow",
+    "depends_on_past": False,
+    "email": ["limhaneul12@naver.com"],
+    "email_on_failure": False,
+    "email_on_retry": False,
+    "retries": 1,
+    "retry_delay": timedelta(minutes=10),
+}
 with DAG(
     dag_id="deep_data_API",
-    default_args=default_args,
+    default_args=default_args2,
     schedule=None,
     schedule_interval=None,
     tags=["딥 크롤링"],
