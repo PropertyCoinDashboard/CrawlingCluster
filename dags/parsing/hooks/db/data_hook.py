@@ -65,6 +65,8 @@ def extract_mysql_data_to_s3() -> None:
 
 
 class KeywordExtractor:
+    """계산하는 로직"""
+
     def __init__(
         self,
         url: str,
@@ -72,6 +74,14 @@ class KeywordExtractor:
         keyword: list[tuple[str, int]],
         present_time_str: datetime,
     ) -> None:
+        """
+
+        Args:
+            url (str): url
+            text (str): text 원문
+            keyword (list[tuple[str, int]]): 단어 빈도 수
+            present_time_str (datetime): 현재 날짜
+        """
         self.url = url
         self.text = text
         self.keyword = keyword
@@ -80,16 +90,20 @@ class KeywordExtractor:
         self.okt = Okt()
 
     def _clean_text(self) -> list[str]:
+        """문장 당 30자 이하 필터링"""
         sentences = self.text.split(".")
         return [sentence for sentence in sentences if len(sentence) > 30]
 
     def _join_sentences(self, sentences: list[str]) -> str:
+        """필터링한 URL 합치기"""
         return " ".join(sentences)
 
     def __len__(self) -> int:
+        """길이 계산"""
         return len(self._join_sentences(self.cleaned_text))
 
     def calculate_frequencies(self) -> list[tuple[str, float]]:
+        """제일 많이 나온 단어가 text에서 몇퍼센트의 비율을 차지하는지"""
         try:
             keywords = self.keyword
             total_sentences = len(self.cleaned_text)
@@ -103,12 +117,14 @@ class KeywordExtractor:
             return frequencies
 
     def time_cal(self) -> int:
+        """시간 계산"""
         present_time_str = self.present_time.replace(": ", " ")
         present_date = datetime.strptime(present_time_str, "%Y-%m-%d %H:%M:%S")
         present_date = int(present_date.strftime("%Y%m%d"))
         return present_date
 
     def calculate_target(self) -> float:
+        """계산 로직"""
         present_time = datetime.now(pytz.timezone("Asia/Seoul")).date()
         present_time_int = int(present_time.strftime("%Y%m%d"))
 

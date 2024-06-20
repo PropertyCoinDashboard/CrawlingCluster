@@ -8,10 +8,7 @@ from collections import Counter
 from typing import Any, Union, Callable
 
 from konlpy.tag import Okt
-
-import requests
 from bs4 import BeautifulSoup
-import aiohttp
 
 from parsing.hooks.db.data_hook import KeywordExtractor
 from airflow.providers.mysql.hooks.mysql import MySqlHook
@@ -40,6 +37,7 @@ async def fetch_content(link: str) -> str:
 
 
 def keword_preprocessing(text: str) -> list[tuple[str, int]]:
+    """관련어 계산"""
     okt = Okt()
 
     okt_pos = okt.pos(text, norm=True, stem=True)
@@ -163,6 +161,17 @@ class URLClassifier:
     async def data_checking(
         self, retry: bool, result: dict[str, str], delete_table: str, process: Callable
     ) -> dict[str, str] | None:
+        """데이터가 테이블에 있는지 확인후 있으면 삭제후 다른 테이블에 넣기
+
+        Args:
+            retry (bool): status를 다시 요청하기 위해서 진행했는가
+            result (dict[str, str]): url 뭉치들
+            delete_table (str): 삭제할 테이블
+            process (Callable): 삭제한 데이터를 어떤 테이블에 다시 넣을것인가
+
+        Returns:
+            dict[str, str] | None: 만약 retry를 하지 않았다면 status를 검사를 안했기에 url 뭉치를 넘겨줌
+        """
         if not retry:
             return result
 
@@ -265,7 +274,6 @@ class Pipeline:
         for data in urls:
             self.db_handler.insert_total_url(data)
 
-    # fmt: off
     async def process_url(self, url: list, func: Callable) -> Any:
         """URL을 처리하여 비동기적으로 요청
 
@@ -273,9 +281,10 @@ class Pipeline:
             url (list): 처리할 URL 목록
             func (Callable): URL을 처리할 함수
         """
+
         def lambda_process(process: chain) -> list:
             return list(map(lambda item: func(item), process))
-        
+
         match type(url[0]):
             case builtins.tuple:
                 tasks: list[dict[str, str]] = [
@@ -290,6 +299,7 @@ class Pipeline:
                 return await asyncio.gather(*tasks, return_exceptions=False)
 
     async def _context_extract(self, result: dict) -> dict[str, Union[int, str, float]]:
+        """계산하기 위한 로직 text와 단어 빈도, 단어 빈도와 날짜에 따른 score 계산 1점 만점"""
         result["content"] = await fetch_content(result["link"])
         result["keyword"] = keword_preprocessing(result["content"])
         result["score"] = KeywordExtractor(
@@ -299,12 +309,24 @@ class Pipeline:
             present_time_str=result["date"],
         ).calculate_target()
         return result
-    
-    async def request_transfor(self, **context) -> None:
-        urls = context["ti"].xcom_pull(key="request_url")
+
+    async def async_cal_score(self, urls: list) -> list[dict[str, str]]:
+        """200 request score 및 content 뽑기
+
+        Args:
+            urls (list): 대상 url dict
+
+        Returns:
+            list[dict[str, str]]: [{"title": ~, "url": ~ , "content": ~}]
+        """
         tasks = list(map(lambda data: self._context_extract(result=data), urls))
-        result: list[dict[str, str]] = await asyncio.gather(*tasks, return_exceptions=False)
-        
+        result = await asyncio.gather(*tasks, return_exceptions=False)
+        return result
+
+    async def request_transfor(self, **context) -> None:
+        """request_url 안에 있는 urls 뭉치 넣고 request_extraction xcom에 저장"""
+        urls = context["ti"].xcom_pull(key="request_url")
+        result: list[dict[str, str]] = await self.async_cal_score(urls)
         context["ti"].xcom_push(key="request_extraction", value=result)
 
     async def retry_status_classifcation(self, **context: dict[str, Any]) -> None:
