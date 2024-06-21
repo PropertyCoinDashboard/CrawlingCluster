@@ -32,7 +32,7 @@ async def fetch_content(link: str) -> str:
         response: str = await ARAH.async_fetch_content(response_type="html", url=link)
         text: str = BeautifulSoup(response, "lxml").get_text(separator=" ", strip=True)
         return text
-    except TypeError:
+    except Exception:
         return ""
 
 
@@ -304,6 +304,7 @@ class Pipeline:
         result["keyword"] = keword_preprocessing(result["content"])
         result["score"] = KeywordExtractor(
             url=result["link"],
+            title=result["title"],
             text=result["content"],
             keyword=result["keyword"],
             present_time_str=result["date"],
@@ -351,7 +352,7 @@ class Pipeline:
         data = await self.process_url(urls, self.url_classifier.request_classify)
         request, not_request = [], []
         for item in data:
-            if item and item.get("status") is not None:
+            if item and item.get("status") != 200:
                 not_request.append(item)
             else:
                 request.append(item)

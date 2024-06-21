@@ -31,7 +31,7 @@ def preprocessing(**context) -> list[list[str]]:
 def keword_preprocessing(text: str) -> list[tuple[str, int]]:
     okt = Okt()
 
-    okt_pos = okt.pos(text, norm=True, stem=True)
+    okt_pos: list | list[tuple[str]] = okt.pos(text, norm=True, stem=True)
 
     # fmt: off
     str_preprocessing = list(filter(lambda data: data if data[1] in "Noun" else None, okt_pos))
@@ -70,6 +70,7 @@ class KeywordExtractor:
     def __init__(
         self,
         url: str,
+        title: str,
         text: str,
         keyword: list[tuple[str, int]],
         present_time_str: datetime,
@@ -83,16 +84,30 @@ class KeywordExtractor:
             present_time_str (datetime): 현재 날짜
         """
         self.url = url
+        self.title = title
         self.text = text
         self.keyword = keyword
+        self.keyword_coin = set(["비트코인", "비트", "코인", "리플", "BTC", "btc"])
+        self.keyword_other = set(["채굴", "화폐", "가상화폐", "달러"])
         self.cleaned_text = self._clean_text()
         self.present_time = present_time_str
         self.okt = Okt()
 
     def _clean_text(self) -> list[str]:
         """문장 당 30자 이하 필터링"""
-        sentences = self.text.split(".")
-        return [sentence for sentence in sentences if len(sentence) > 30]
+        sentences = self.text.split(",")
+        return [
+            sentence
+            for sentence in sentences
+            if (
+                len(sentence.strip()) <= 30
+                and (
+                    any(keyword in sentence for keyword in self.keyword_coin)
+                    or any(keyword in sentence for keyword in self.keyword_other)
+                )
+            )
+            or len(sentence.strip()) > 30
+        ]
 
     def _join_sentences(self, sentences: list[str]) -> str:
         """필터링한 URL 합치기"""
@@ -105,15 +120,21 @@ class KeywordExtractor:
     def calculate_frequencies(self) -> list[tuple[str, float]]:
         """제일 많이 나온 단어가 text에서 몇퍼센트의 비율을 차지하는지"""
         try:
-            keywords = self.keyword
-            total_sentences = len(self.cleaned_text)
-            frequencies = [
-                (keyword, round((count / total_sentences), 2))
-                for keyword, count in keywords
-            ]
+            total_sentences: int = self.__len__()
+            frequencies = list(
+                map(
+                    lambda x: (x[0], min(round(x[1] / total_sentences * 100, 2), 1.0)),
+                    (
+                        filter(lambda x: x == self.keyword[0], [self.keyword[0]])
+                        if self.keyword
+                        else []
+                    ),
+                )
+            )
+
             return frequencies
         except ZeroDivisionError:
-            frequencies = 0
+            frequencies = (self.keyword[0][0], 0)
             return frequencies
 
     def time_cal(self) -> int:
@@ -125,44 +146,38 @@ class KeywordExtractor:
 
     def calculate_target(self) -> float:
         """계산 로직"""
-        present_time = datetime.now(pytz.timezone("Asia/Seoul")).date()
-        present_time_int = int(present_time.strftime("%Y%m%d"))
-
-        new_time = self.time_cal()
 
         def target_score(freq_value: str, target: float) -> float:
-            if freq_value in ["비트코인", "비트", "코인", "리플"]:
+            if freq_value in self.keyword_coin:
                 target += 0.4
-            elif freq_value in ["채굴", "화폐", "가상화폐", "달러"]:
+            elif freq_value in self.keyword_other:
                 target += 0.2
             else:
                 target -= 0.2
             return target
 
+        present_time = datetime.now(pytz.timezone("Asia/Seoul")).date()
+        present_time_int = int(present_time.strftime("%Y%m%d"))
+
+        new_time: int = self.time_cal()
+
         target = 0.4  # 기본 점수 설정을 낮춤
+
+        if any(keyword in self.title for keyword in self.keyword_coin):
+            target += 0.1
+
         for frequency in self.calculate_frequencies():
-            freq_value = frequency
+            print(frequency)
+            freq_value, freq_score = frequency
 
-            if isinstance(freq_value[1], float):
-                if self.__len__() > 5300 and freq_value[1] >= 0.35:
-                    target = target_score(freq_value[0], target)
-                elif self.__len__() > 4500 and freq_value[1] >= 0.35:
-                    target = target_score(freq_value[0], target)
-                elif self.__len__() > 3500 and freq_value[1] >= 0.45:
-                    target = target_score(freq_value[0], target)
-                elif self.__len__() > 2300 and freq_value[1] >= 0.5:
-                    target = target_score(freq_value[0], target)
+            if isinstance(freq_score, float):
+                length: int = self.__len__()
+                if (2000 <= length <= 10000) and (0.25 <= freq_score <= 0.9):
+                    target = target_score(freq_value, target)
 
-        if present_time_int == new_time:
-            target += 0
-        elif present_time_int - new_time == 2:
-            target -= -0.1
-        elif present_time_int - new_time == 3:
-            target -= -0.2
-        elif present_time_int - new_time == 4:
-            target -= -0.3
-        else:
-            target += 0
+        adjustments = {0: 0, 2: -0.1, 3: -0.2, 4: -0.3}
+        difference = present_time_int - new_time
+        target += adjustments.get(difference, -0.4)
 
         # 최대 1점을 넘지 않도록 조정
         if target > 1.0:
